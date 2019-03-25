@@ -1,3 +1,11 @@
-baseurl = "/"
 languageCode = "en-us"
-title = "Homepage"
+title = "Blog"
+theme = "m10c"
+[params]
+  author = "Conor Griffin"
+  [[params.social]]
+    name = "github"
+    url = "https://github.com/conorgriffin"
+  [[params.social]]
+    name = "twitter"
+    url = "https://twitter.com/conorgriffin"
