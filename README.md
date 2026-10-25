@@ -16,4 +16,4 @@ All the copy that changes lives in `src/content/`:
 - `apps.ts` – the app cards (set `url` once an app has a website)
 - `site.ts` – social links
 
-Deploys from `master`: `netlify.toml` for Netlify, or `.github/workflows/deploy.yml` for GitHub Pages (`public/CNAME` carries the domain).
+Hosted on Vercel, which builds `master` with `npm run build` and serves `dist/`; every PR gets a preview deploy.
