@@ -5,8 +5,10 @@ export const skills = [
   "AI agents & MCP",
   "Agentic SDLC",
   "Observability",
-  "Swift & Apple platforms",
-  "TypeScript",
   "Java",
+  "Scala",
+  "Kotlin",
+  "TypeScript",
+  "Swift & Apple platforms",
   "Engineering leadership",
 ];
