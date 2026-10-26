@@ -24,7 +24,7 @@ export const experience: ExperienceCompany[] = [
     end: "Present",
     tenure: "9 yrs",
     summary:
-      "Leading engineering teams on Workday Orchestrate, Workday's integration platform. Hands-on with enabling Orchestrate for AI agents and MCP, and bringing agentic development practices to the team.",
+      "Several years on Workday's classic integration platforms, the ones that run critical business operations for most of the Fortune 500. Recently moved to Workday Orchestrate, the next-generation integration platform built to innovate quickly, adopt new technologies and adapt to customers at pace, where I lead engineering teams and stay hands-on with enabling Orchestrate for AI agents and MCP.",
     roles: [
       {
         role: "Sr Software Engineering Manager",
@@ -44,7 +44,8 @@ export const experience: ExperienceCompany[] = [
     location: "Dublin, Ireland",
     start: "Mar 2014",
     end: "Jun 2017",
-    summary: "Built integration tooling and managed the enterprise web service platform.",
+    summary:
+      "Helped build the platform behind the initial worldwide release of Apple Pay, and built Mastercard's first microservice platform, used by internal teams to ship B2B and B2C products.",
     roles: [
       {
         role: "Technical Consultant",
@@ -68,7 +69,8 @@ export const experience: ExperienceCompany[] = [
     start: "Feb 2006",
     end: "Mar 2014",
     tenure: "8 yrs",
-    summary: "Systems programming and administration for business-critical mainframe platforms.",
+    summary:
+      "Part of a small team that owned the bank's ATM and point-of-sale platform, a \"platinum\" service critical to the running of the bank. Also ran the WebSphere and mainframe systems behind the core banking platform the entire branch network used for customer transactions.",
     roles: [
       {
         role: "WebSphere Administrator",

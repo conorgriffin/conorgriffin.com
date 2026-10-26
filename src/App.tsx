@@ -119,14 +119,16 @@ export function App() {
 
         <Section id="about" eyebrow="About" title="Hello, I'm Conor.">
           <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl">
-            I've spent around twenty years building and running software, starting as a systems programmer on
-            IBM mainframe and HP NonStop machines at AIB, then moving into integration and microservices
-            platforms at Mastercard. At Workday I've gone from engineer to principal engineer to leading teams
-            on Workday Orchestrate, Workday's integration platform, and I've stayed hands-on the whole way:
-            these days that means enabling Orchestrate for AI agents and MCP, and using agentic tooling to make
-            our own engineering faster. I like the mix of deep technical work and helping a team do its best
-            work, and I'd happily lean either way. In my spare time I ship small, thoughtful indie apps for
-            Apple platforms, the kind of tools I want to use myself.
+            I've spent around twenty years building and running software that businesses depend on. I started at AIB
+            on the mainframe and HP NonStop systems behind the bank's ATM network and core branch banking, then at
+            Mastercard helped build the platform behind the worldwide launch of Apple Pay and the company's first
+            microservice platform. At Workday I've gone from engineer to principal engineer to leading teams, first
+            on the classic integration platforms that run critical operations for most of the Fortune 500 and now on
+            Workday Orchestrate, the next generation. I've stayed hands-on the whole way: these days that means
+            enabling Orchestrate for AI agents and MCP, and using agentic tooling to make our own engineering faster.
+            I like the mix of deep technical work and helping a team do its best work, and I'd happily lean either
+            way. In my spare time I ship small, thoughtful indie apps for Apple platforms, the kind of tools I want
+            to use myself.
           </p>
         </Section>
 
