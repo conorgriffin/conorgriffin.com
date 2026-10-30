@@ -24,14 +24,14 @@ export const apps: App[] = [
     platforms: ["iPhone", "Apple Watch"],
     blurb:
       "The sideline score and match clock for amateur games, so coaches and parents can keep score and time from the touchline on their phone or wrist.",
-    url: "#", // TODO: website
+    url: "https://gettopscore.app",
   },
   {
     name: "Switchboard",
     platforms: ["Mac"],
     blurb:
       "Switch audio instantly. Every speaker, headset and mic is one click or keystroke away in the menu bar, and Auto-Switch rules pick the right device as things connect.",
-    url: "#", // TODO: website
+    url: "https://getswitchboard.app",
   },
   {
     name: "Disco",
