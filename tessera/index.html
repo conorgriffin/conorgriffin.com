@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tessera — JWT &amp; JWE inspector for Mac</title>
+    <meta name="description" content="Tessera is a native Mac app for reading, verifying and building JSON Web Tokens. Paste a JWT or JWE and see whether it's valid, and if not, why. Everything stays on your Mac." />
+    <meta name="author" content="Conor Griffin" />
+    <link rel="canonical" href="https://conorgriffin.com/tessera" />
+    <meta property="og:site_name" content="Conor Griffin" />
+    <meta property="og:type" content="product" />
+    <meta property="og:url" content="https://conorgriffin.com/tessera" />
+    <meta property="og:title" content="Tessera — JWT &amp; JWE inspector for Mac" />
+    <meta property="og:description" content="Tessera is a native Mac app for reading, verifying and building JSON Web Tokens. Paste a JWT or JWE and see whether it's valid, and if not, why. Everything stays on your Mac." />
+    <meta property="og:image" content="https://conorgriffin.com/tessera/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="750" />
+    <meta property="og:image:alt" content="Tessera for Mac showing a verified JSON Web Token" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/tessera-icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@400;500;600&display=swap" />
+    <script>
+      (function () {
+        document.documentElement.classList.add("js");
+        try {
+          var t = localStorage.getItem("theme");
+          if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches))
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body data-page="home">
+    <div id="root"></div>
+    <script type="module" src="/src/tessera/main.tsx"></script>
+  </body>
+</html>

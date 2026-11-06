@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@400;500;600&display=swap" />
     <script>
       (function () {
+        document.documentElement.classList.add("js");
         try {
           var t = localStorage.getItem("theme");
           if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches))
