@@ -17,21 +17,21 @@ export function SupportPage() {
       <div className="mx-auto max-w-2xl pb-24">
         <PageIntro title="Support" subtitle="Tessera for Mac" />
 
-        <section aria-labelledby="contact-title" className="mt-10 rounded-2xl border border-tessera-line bg-tessera-navy p-6 text-tessera-ink md:p-8">
+        <section aria-labelledby="contact-title" className="mt-10 rounded-2xl border border-tessera-panel-line bg-tessera-panel p-6 text-tessera-panel-ink md:p-8">
           <h2 id="contact-title" className="text-2xl font-medium md:text-3xl">Get in touch</h2>
           <p className="mt-3 text-lg leading-relaxed">
-            Email me at <a href={mailto} className="break-all font-medium text-tile-teal underline underline-offset-4">{email}</a> and I'll get back to you.
+            Email me at <a href={mailto} className="break-all font-medium text-tessera-accent underline underline-offset-4">{email}</a> and I'll get back to you.
           </p>
-          <p className="mt-5 text-sm text-tessera-ink-muted">It helps to include:</p>
-          <ul className="mt-3 space-y-2 text-tessera-ink-muted">
+          <p className="mt-5 text-sm text-tessera-panel-muted">It helps to include:</p>
+          <ul className="mt-3 space-y-2 text-tessera-panel-muted">
             <li className="flex gap-3"><TileBullet i={0} />Your macOS version</li>
             <li className="flex gap-3"><TileBullet i={1} />Your Tessera version (Tessera › About Tessera)</li>
             <li className="flex gap-3"><TileBullet i={2} />Steps to reproduce the problem</li>
           </ul>
-          <p className="mt-5 rounded-xl bg-tessera-navy-deep/70 p-4 text-sm leading-relaxed">
-            <strong className="font-medium text-tile-amber">Please never send real tokens or private keys.</strong> Use a sample token, or redact the signature.
+          <p className="mt-5 rounded-xl bg-tessera-panel-deep p-4 text-sm leading-relaxed">
+            <strong className="font-medium text-tessera-warn">Please never send real tokens or private keys.</strong> Use a sample token, or redact the signature.
           </p>
-          <a href={mailto} className="mt-6 inline-flex items-center gap-2 rounded-full bg-tessera-ink px-5 py-2.5 text-sm font-medium text-tessera-navy transition hover:opacity-90">Email support <span aria-hidden="true">→</span></a>
+          <a href={mailto} className="mt-6 inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90">Email support <span aria-hidden="true">→</span></a>
         </section>
 
         <section aria-labelledby="faq-title" className="reveal mt-16">

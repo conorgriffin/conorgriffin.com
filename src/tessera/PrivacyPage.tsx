@@ -18,7 +18,7 @@ export function PrivacyPage() {
           <p className="mt-4 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-06">6 November 2026</time></p>
         </PageIntro>
 
-        <section aria-label="Summary" className="mt-10 rounded-2xl border border-tessera-line bg-tessera-navy p-6 text-tessera-ink md:p-8">
+        <section aria-label="Summary" className="mt-10 rounded-2xl border border-tessera-panel-line bg-tessera-panel p-6 text-tessera-panel-ink md:p-8">
           <h2 className="eyebrow">Summary</h2>
           <p className="mt-3 text-lg leading-relaxed md:text-xl">Tessera doesn't collect, store or share any personal data. There are no analytics, no advertising, no tracking and no account.</p>
         </section>
