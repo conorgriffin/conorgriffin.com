@@ -64,58 +64,32 @@ const pro = [
   "Full history of up to 500 tokens, encrypted on your Mac, with Prod, Staging and Dev tags",
 ];
 
-function TokenWindow() {
-  const claims: [string, string][] = [
-    ["iss", "https://auth.example.com"],
-    ["sub", "user_8213"],
-    ["aud", "api.example.com"],
-  ];
+const shot = (name: string) => ({
+  src: `/tessera/screenshots/${name}-1600.webp`,
+  srcSet: `/tessera/screenshots/${name}-960.webp 960w, /tessera/screenshots/${name}-1600.webp 1600w`,
+});
+
+/** A real window capture. Captures keep their rounded, transparent corners, so the shadow follows the window shape. */
+function Screenshot({ name, alt, sizes, eager = false, className = "" }: { name: string; alt: string; sizes: string; eager?: boolean; className?: string }) {
   return (
-    <figure aria-label="Tessera window showing a verified token" className="w-full overflow-hidden rounded-2xl border border-tessera-line bg-tessera-navy text-tessera-ink shadow-2xl">
-      <div className="flex items-center gap-2 border-b border-tessera-line bg-tessera-navy-deep px-4 py-3">
-        <span className="h-3 w-3 rounded-full bg-tile-pink" aria-hidden="true" />
-        <span className="h-3 w-3 rounded-full bg-tile-amber" aria-hidden="true" />
-        <span className="h-3 w-3 rounded-full bg-tile-teal" aria-hidden="true" />
-        <span className="ml-3 truncate text-xs text-tessera-ink-muted">access_token.jwt</span>
-      </div>
-      <div className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-tessera-success/15 px-3 py-1 text-sm font-medium text-tessera-success">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
-            Verified
-          </span>
-          <span className="text-xs text-tessera-ink-muted">RS256 · kid 2024-a</span>
-        </div>
-        <div>
-          <div className="flex justify-between text-sm"><span>Expires in 42 min</span><span className="text-tessera-ink-muted">70%</span></div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-tessera-line">
-            <div className="h-full w-[70%] rounded-full bg-tile-teal" />
-          </div>
-        </div>
-        <dl className="divide-y divide-tessera-line rounded-xl bg-tessera-navy-deep/60 text-sm">
-          {claims.map(([k, v]) => (
-            <div key={k} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-              <dt className="font-mono text-tessera-ink-muted">{k}</dt>
-              <dd className="min-w-0 truncate font-mono">{v}</dd>
-            </div>
-          ))}
-          <div className="flex items-center justify-between gap-4 px-4 py-2.5">
-            <dt className="font-mono text-tessera-ink-muted">scope</dt>
-            <dd className="flex flex-wrap justify-end gap-1.5">
-              <span className="rounded-full bg-tile-lavender/20 px-2 py-0.5 font-mono text-xs text-tile-lavender">read:tokens</span>
-              <span className="rounded-full bg-tile-pink/20 px-2 py-0.5 font-mono text-xs text-tile-pink">write:tokens</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
-    </figure>
+    <img {...shot(name)} sizes={sizes} alt={alt} width={1600} height={1000}
+      loading={eager ? "eager" : "lazy"} decoding="async"
+      className={`h-auto w-full drop-shadow-[0_18px_40px_rgba(19,20,31,0.28)] ${className}`} />
   );
 }
+
+const gallery: { name: string; title: string; caption: string; pro?: boolean }[] = [
+  { name: "02-security", title: "Security checks in plain English", caption: "A remote key URL and an embedded key in the header, flagged before you trust the token." },
+  { name: "03-claims", title: "Claims, not curly braces", caption: "Readable names, local times, and scopes and audiences as chips." },
+  { name: "04-jwe", title: "JWE, inspected and decrypted", caption: "The protected header, the key it needs, and the nested signed token inside." },
+  { name: "05-builder", title: "Build and sign", caption: "Edit claims as JSON with quick adds, then sign with any supported algorithm." },
+  { name: "06-keys", title: "Keys in your Keychain", caption: "Name and tag the keys you use, optionally behind Touch ID.", pro: true },
+];
 
 export function TesseraPage() {
   return (
     <TesseraLayout current="home">
-      <section aria-labelledby="hero-title" className="grid items-center gap-12 py-16 md:grid-cols-[1.1fr_1fr] md:py-24">
+      <section aria-labelledby="hero-title" className="pt-16 md:pt-24">
         <div>
           <TesseraIcon size={88} animate />
           <p className="eyebrow mt-8">macOS app</p>
@@ -132,10 +106,19 @@ export function TesseraPage() {
             <span className="text-sm text-muted-foreground">Requires macOS 15 or later</span>
           </div>
         </div>
-        <TokenWindow />
+        <figure className="mt-14 md:mt-20">
+          <div className="dark:hidden">
+            <Screenshot name="01-verified" eager sizes="(min-width: 1024px) 976px, calc(100vw - 48px)"
+              alt="Tessera showing a verified RS256 ID token: an expiry countdown, the decoded claims and passing security checks." />
+          </div>
+          <div className="hidden dark:block">
+            <Screenshot name="08-dark" sizes="(min-width: 1024px) 976px, calc(100vw - 48px)"
+              alt="Tessera in dark appearance showing a verified RS256 ID token with its payload as syntax-highlighted JSON." />
+          </div>
+        </figure>
       </section>
 
-      <aside aria-label="Privacy" className="reveal flex flex-col gap-4 rounded-2xl border bg-card p-6 sm:flex-row sm:items-center sm:justify-between md:p-8">
+      <aside aria-label="Privacy" className="reveal mt-16 flex flex-col gap-4 rounded-2xl border bg-card p-6 sm:flex-row sm:items-center sm:justify-between md:p-8">
         <div className="flex items-start gap-4">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0 text-tessera-accent" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
           <p className="text-lg leading-relaxed">Everything happens on your Mac. Tokens and keys are never uploaded, there's no account, and the app collects no data.</p>
@@ -160,6 +143,41 @@ export function TesseraPage() {
               </ul>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="tour-title" className="reveal pb-24">
+        <p className="eyebrow">A closer look</p>
+        <h2 id="tour-title" className="mt-3 text-4xl font-medium md:text-5xl">See it at work.</h2>
+        <div className="mt-12 grid gap-x-10 gap-y-16 md:grid-cols-2">
+          {gallery.map((g, i) => (
+            <figure key={g.name}>
+              <Screenshot name={g.name} alt={`${g.title}: ${g.caption}`} sizes="(min-width: 768px) 468px, calc(100vw - 48px)" />
+              <figcaption className="mt-5">
+                <p className="flex items-center gap-3 font-display text-xl font-medium">
+                  <span aria-hidden="true" className={`h-3 w-3 rounded-[4px] ${tileColors[i % 4]}`} />
+                  {g.title}
+                  {g.pro && <span className="rounded-full bg-tessera-navy px-2 py-0.5 font-sans text-xs font-medium text-tessera-ink">Pro</span>}
+                </p>
+                <p className="mt-2 leading-relaxed text-muted-foreground">{g.caption}</p>
+              </figcaption>
+            </figure>
+          ))}
+          <figure className="flex flex-col">
+            <div className="grid flex-1 place-items-center rounded-2xl bg-gradient-to-b from-[#3d7fb8] to-[#c9d3df] p-6">
+              <img src="/tessera/screenshots/07-menubar-812.webp" srcSet="/tessera/screenshots/07-menubar-406.webp 406w, /tessera/screenshots/07-menubar-812.webp 812w"
+                sizes="(min-width: 768px) 406px, calc(100vw - 96px)" width={812} height={666} loading="lazy" decoding="async"
+                alt="The Tessera menu bar popover showing a JWT detected on the clipboard, with its subject, issuer and expiry." className="h-auto w-full max-w-[406px]" />
+            </div>
+            <figcaption className="mt-5">
+              <p className="flex items-center gap-3 font-display text-xl font-medium">
+                <span aria-hidden="true" className="h-3 w-3 rounded-[4px] bg-tile-amber" />
+                Peek from the menu bar
+                <span className="rounded-full bg-tessera-navy px-2 py-0.5 font-sans text-xs font-medium text-tessera-ink">Pro</span>
+              </p>
+              <p className="mt-2 leading-relaxed text-muted-foreground">Copy a token anywhere and see who it's for and when it expires, without switching apps.</p>
+            </figcaption>
+          </figure>
         </div>
       </section>
 
