@@ -25,6 +25,17 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-tessera-navy: var(--tessera-navy);
+  --color-tessera-navy-deep: var(--tessera-navy-deep);
+  --color-tessera-line: var(--tessera-line);
+  --color-tessera-ink: var(--tessera-ink);
+  --color-tessera-ink-muted: var(--tessera-ink-muted);
+  --color-tessera-success: var(--tessera-success);
+  --color-tessera-accent: var(--tessera-accent);
+  --color-tile-pink: var(--tile-pink);
+  --color-tile-lavender: var(--tile-lavender);
+  --color-tile-teal: var(--tile-teal);
+  --color-tile-amber: var(--tile-amber);
 }
 
 :root {
@@ -43,6 +54,19 @@
   --accent-foreground: oklch(0.42 0.14 42);
   --border: oklch(0.9 0.01 80);
   --ring: oklch(0.58 0.17 42);
+
+  /* Tessera, taken from its app icon */
+  --tessera-navy: #1e2034;
+  --tessera-navy-deep: #13141f;
+  --tessera-line: oklch(1 0 0 / 10%);
+  --tessera-ink: oklch(0.95 0.01 280);
+  --tessera-ink-muted: oklch(0.78 0.02 280);
+  --tessera-success: oklch(0.78 0.16 155);
+  --tessera-accent: oklch(0.5 0.15 285);
+  --tile-pink: #f77fa6;
+  --tile-lavender: #a99cf5;
+  --tile-teal: #4fd1c5;
+  --tile-amber: #efa968;
 }
 
 .dark {
@@ -60,6 +84,7 @@
   --accent-foreground: oklch(0.85 0.1 50);
   --border: oklch(1 0 0 / 10%);
   --ring: oklch(0.72 0.15 48);
+  --tessera-accent: oklch(0.78 0.11 285);
 }
 
 @layer base {
@@ -90,4 +115,21 @@
   text-transform: uppercase;
   color: var(--color-primary);
   font-weight: 600;
+}
+
+/* Without JavaScript, show .reveal content rather than leaving it hidden. */
+html:not(.js) .reveal { opacity: 1; transform: none; }
+
+@utility tessera-rule {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--tile-pink) 0 25%, var(--tile-lavender) 25% 50%, var(--tile-teal) 50% 75%, var(--tile-amber) 75%);
+}
+
+@keyframes tile-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@utility tessera-tile-anim {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tile-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @media (prefers-reduced-motion: reduce) { animation: none; }
 }

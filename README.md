@@ -16,4 +16,6 @@ All the copy that changes lives in `src/content/`:
 - `apps.ts` – the app cards (set `url` once an app has a website)
 - `site.ts` – social links
 
+The Tessera app pages live in `src/tessera/` and are served at `/tessera`, `/tessera/privacy` and `/tessera/support` (one HTML entry per page under `tessera/`). Tessera links to the privacy and support URLs from inside the app and from its App Store listing, so keep those paths stable. `npm run build` prerenders these pages to static HTML (`scripts/prerender.mjs`) so they work without JavaScript.
+
 Hosted on Vercel, which builds `master` with `npm run build` and serves `dist/`; every PR gets a preview deploy.

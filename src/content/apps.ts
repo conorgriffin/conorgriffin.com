@@ -5,11 +5,20 @@ export type App = {
   platforms: Platform[];
   tagline?: string;
   blurb: string;
-  url: string; // "#" until a website exists
+  url: string; // "#" until a website exists; a path like "/tessera" links to a page on this site
   status?: string;
 };
 
 export const apps: App[] = [
+  {
+    name: "Tessera",
+    platforms: ["Mac"],
+    tagline: "Read, verify and build JSON Web Tokens.",
+    blurb:
+      "Decode and verify JWT and JWE tokens on your Mac, with a clear verdict, a live expiry countdown and plain-English security checks. Nothing leaves your machine.",
+    url: "/tessera",
+    status: "Coming soon to the Mac App Store",
+  },
   {
     name: "ChessMates",
     platforms: ["iPhone", "iPad"],
