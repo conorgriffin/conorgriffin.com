@@ -1,5 +1,6 @@
 import { TesseraLayout, paths } from "./Layout";
 import { TesseraIcon, TileBullet, tileColors } from "./TesseraIcon";
+import { EnlargeButton, LightboxProvider } from "./Lightbox";
 
 const features: { title: string; points: string[] }[] = [
   {
@@ -72,9 +73,11 @@ const shot = (name: string) => ({
 /** A real window capture. Captures keep their rounded, transparent corners, so the shadow follows the window shape. */
 function Screenshot({ name, alt, sizes, eager = false, className = "" }: { name: string; alt: string; sizes: string; eager?: boolean; className?: string }) {
   return (
-    <img {...shot(name)} sizes={sizes} alt={alt} width={1600} height={1000}
-      loading={eager ? "eager" : "lazy"} decoding="async"
-      className={`h-auto w-full drop-shadow-[0_18px_40px_rgba(19,20,31,0.28)] ${className}`} />
+    <EnlargeButton image={{ src: `/tessera/screenshots/${name}-2880.webp`, alt, width: 2880, height: 1800 }} className="rounded-[18px]">
+      <img {...shot(name)} sizes={sizes} alt={alt} width={1600} height={1000}
+        loading={eager ? "eager" : "lazy"} decoding="async"
+        className={`h-auto w-full drop-shadow-[0_18px_40px_rgba(19,20,31,0.28)] ${className}`} />
+    </EnlargeButton>
   );
 }
 
@@ -88,6 +91,7 @@ const gallery: { name: string; title: string; caption: string; pro?: boolean }[]
 
 export function TesseraPage() {
   return (
+    <LightboxProvider>
     <TesseraLayout current="home">
       <section aria-labelledby="hero-title" className="pt-16 md:pt-24">
         <div>
@@ -165,9 +169,12 @@ export function TesseraPage() {
           ))}
           <figure className="flex flex-col">
             <div className="grid flex-1 place-items-center rounded-2xl bg-gradient-to-b from-[#3d7fb8] to-[#c9d3df] p-6">
-              <img src="/tessera/screenshots/07-menubar-812.webp" srcSet="/tessera/screenshots/07-menubar-406.webp 406w, /tessera/screenshots/07-menubar-812.webp 812w"
+              <EnlargeButton className="max-w-[406px] rounded-[18px]" image={{ src: "/tessera/screenshots/07-menubar-812.webp", width: 812, height: 666,
+                alt: "The Tessera menu bar popover showing a JWT detected on the clipboard, with its subject, issuer and expiry." }}>
+                <img src="/tessera/screenshots/07-menubar-812.webp" srcSet="/tessera/screenshots/07-menubar-406.webp 406w, /tessera/screenshots/07-menubar-812.webp 812w"
                 sizes="(min-width: 768px) 406px, calc(100vw - 96px)" width={812} height={666} loading="lazy" decoding="async"
                 alt="The Tessera menu bar popover showing a JWT detected on the clipboard, with its subject, issuer and expiry." className="h-auto w-full max-w-[406px]" />
+              </EnlargeButton>
             </div>
             <figcaption className="mt-5">
               <p className="flex items-center gap-3 font-display text-xl font-medium">
@@ -202,5 +209,6 @@ export function TesseraPage() {
         </div>
       </section>
     </TesseraLayout>
+    </LightboxProvider>
   );
 }
