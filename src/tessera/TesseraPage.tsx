@@ -200,9 +200,9 @@ export function TesseraPage() {
               {free.map((p) => <li key={p} className="flex gap-3 leading-relaxed"><TileBullet i={2} />{p}</li>)}
             </ul>
           </div>
-          <div className="rounded-2xl border border-tessera-line bg-tessera-navy p-7 text-tessera-ink">
-            <h3 className="text-2xl font-medium">Pro <span className="ml-2 align-middle font-sans text-sm font-normal text-tessera-ink-muted">Everything in Free, plus</span></h3>
-            <ul className="mt-5 space-y-3 text-tessera-ink-muted">
+          <div className="rounded-2xl border border-tessera-panel-line bg-tessera-panel p-7 text-tessera-panel-ink">
+            <h3 className="text-2xl font-medium">Pro <span className="ml-2 align-middle font-sans text-sm font-normal text-tessera-panel-muted">Everything in Free, plus</span></h3>
+            <ul className="mt-5 space-y-3 text-tessera-panel-muted">
               {pro.map((p, i) => <li key={p} className="flex gap-3 leading-relaxed"><TileBullet i={i} />{p}</li>)}
             </ul>
           </div>

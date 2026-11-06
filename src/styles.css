@@ -32,6 +32,12 @@
   --color-tessera-ink-muted: var(--tessera-ink-muted);
   --color-tessera-success: var(--tessera-success);
   --color-tessera-accent: var(--tessera-accent);
+  --color-tessera-panel: var(--tessera-panel);
+  --color-tessera-panel-deep: var(--tessera-panel-deep);
+  --color-tessera-panel-line: var(--tessera-panel-line);
+  --color-tessera-panel-ink: var(--tessera-panel-ink);
+  --color-tessera-panel-muted: var(--tessera-panel-muted);
+  --color-tessera-warn: var(--tessera-warn);
   --color-tile-pink: var(--tile-pink);
   --color-tile-lavender: var(--tile-lavender);
   --color-tile-teal: var(--tile-teal);
@@ -67,6 +73,14 @@
   --tile-lavender: #a99cf5;
   --tile-teal: #4fd1c5;
   --tile-amber: #efa968;
+
+  /* Highlighted panels (Pro, privacy summary, support contact): a lavender tint in light mode, the icon's navy in dark. */
+  --tessera-panel: oklch(0.965 0.02 285);
+  --tessera-panel-deep: oklch(0.93 0.03 285);
+  --tessera-panel-line: oklch(0.89 0.04 285);
+  --tessera-panel-ink: var(--foreground);
+  --tessera-panel-muted: var(--muted-foreground);
+  --tessera-warn: oklch(0.5 0.12 55);
 }
 
 .dark {
@@ -85,6 +99,12 @@
   --border: oklch(1 0 0 / 10%);
   --ring: oklch(0.72 0.15 48);
   --tessera-accent: oklch(0.78 0.11 285);
+  --tessera-panel: #1e2034;
+  --tessera-panel-deep: #13141f;
+  --tessera-panel-line: oklch(1 0 0 / 10%);
+  --tessera-panel-ink: oklch(0.95 0.01 280);
+  --tessera-panel-muted: oklch(0.78 0.02 280);
+  --tessera-warn: #efa968;
 }
 
 @layer base {
