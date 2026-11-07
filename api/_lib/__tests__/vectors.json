@@ -1,0 +1,61 @@
+{
+  "_note": "TEST KEYS ONLY. Deterministic seeds; never use in production.",
+  "keys": {
+    "license": {
+      "kid": "T1",
+      "publicKeyBase64": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f"
+    },
+    "revocation": {
+      "kid": "TR1",
+      "publicKeyBase64": "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=",
+      "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEICAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/"
+    },
+    "other": {
+      "publicKeyBase64": "JUO5L/EJVRFHatyDadtt3JM2ZaEZeN2hQE7hBmypVZ0="
+    }
+  },
+  "license": {
+    "payload": {
+      "v": 1,
+      "kid": "T1",
+      "lid": "0123456789abcdef0123456789abcdef",
+      "email": "buyer@example.com",
+      "iat": 1762525200,
+      "product": "tessera-pro"
+    },
+    "valid": "TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0.S-R0lh5_mZC3KrlN0OutqADdcG7nX8HA9tJgvGpj95IAUcMFixG5jir6c0y5BRvVVbjZYvdX-ogVdDn82lP0Bw",
+    "validWithWhitespace": "  TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjA\nxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0.S-R0lh5_mZC3KrlN0OutqADdcG7nX8HA9tJgvGpj95IAUcMFixG5jir6c0y5BRvVVbjZYvdX-ogVdDn82lP0Bw\n",
+    "tamperedPayload": "TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJldmlsQGV4YW1wbGUuY29tIiwiaWF0IjoxNzYyNTI1MjAwLCJwcm9kdWN0IjoidGVzc2VyYS1wcm8ifQ.S-R0lh5_mZC3KrlN0OutqADdcG7nX8HA9tJgvGpj95IAUcMFixG5jir6c0y5BRvVVbjZYvdX-ogVdDn82lP0Bw",
+    "signedByOtherKey": "TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0._MVFPNDJa8RsMh3bJkU2JJmCc2bXfv9zLLBRidoDjm3nHbhXeg1B_4QzMWMkqtUEqGvaS2AURy_TjnLBcsUwDQ",
+    "unknownKid": "TSR1-eyJ2IjoxLCJraWQiOiJaWiIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0.xFIP5TpTeCqmU--j9mZTYTSXuDG0rlurhvnlZSxN6bmvkfBiURuAb-HZM9bifHDbCxR3F27PxMTqCKx6f4StBQ",
+    "wrongProduct": "TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6Im90aGVyIn0.zyvamy1oUNHr5gdeZoTr27bdLPn2FBpJLxYP_I4C2nSqtqFM5P4NljnUIYIFcgdteA8icRWct941qYc5L8sxCg",
+    "malformed": [
+      "",
+      "TSR1-",
+      "TSR2-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0.S-R0lh5_mZC3KrlN0OutqADdcG7nX8HA9tJgvGpj95IAUcMFixG5jir6c0y5BRvVVbjZYvdX-ogVdDn82lP0Bw",
+      "TSR1-abc",
+      "TSR1-!!!.???"
+    ]
+  },
+  "revocationList": {
+    "payload": {
+      "v": 1,
+      "kid": "TR1",
+      "seq": 7,
+      "generated": 1762600000,
+      "revoked": [
+        "0123456789abcdef0123456789abcdef",
+        "ffffffffffffffffffffffffffffffff"
+      ]
+    },
+    "valid": {
+      "payload": "eyJ2IjoxLCJraWQiOiJUUjEiLCJzZXEiOjcsImdlbmVyYXRlZCI6MTc2MjYwMDAwMCwicmV2b2tlZCI6WyIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsImZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIl19",
+      "sig": "PzxyW3JaVgABPsde8aOOx-_fzds7vqfFx_OE3IfxggqmPbP4UmQ2bcK0gM-g31maCUhqRJjpEWVQZjoa_rHjCQ"
+    },
+    "signedWithLicenseKey": {
+      "payload": "eyJ2IjoxLCJraWQiOiJUUjEiLCJzZXEiOjcsImdlbmVyYXRlZCI6MTc2MjYwMDAwMCwicmV2b2tlZCI6WyIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsImZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIl19",
+      "sig": "suwrl3zCIJ_iP51ls5reLZajc5lZzQLUhz24f2pYH129cwy3s_PM-e9KyVP4PK2-d9sm_xvX6KG7crrw8YpbAQ"
+    }
+  }
+}
