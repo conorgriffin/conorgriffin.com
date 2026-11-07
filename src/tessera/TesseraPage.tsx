@@ -1,6 +1,7 @@
 import { TesseraLayout, paths } from "./Layout";
 import { TesseraIcon, TileBullet, tileColors } from "./TesseraIcon";
 import { EnlargeButton, LightboxProvider } from "./Lightbox";
+import { useProPrice } from "./price";
 
 const features: { title: string; points: string[] }[] = [
   {
@@ -65,6 +66,25 @@ const pro = [
   "Full history of up to 500 tokens, encrypted on your Mac, with Prod, Staging and Dev tags",
 ];
 
+const faqs: [string, string][] = [
+  ["Is it really free?", "Yes. Decoding, verifying, decrypting, the security checks and building and signing tokens are all free, with no time limit. Tessera Pro adds saved keys, issuer key fetching, JWE encryption, the menu bar popover and history."],
+  ["Is Tessera Pro a subscription?", "No. It's a one-time purchase, shown in your local currency at checkout."],
+  ["Is the download safe to open?", "Yes. It's signed with my Apple Developer ID and notarized by Apple, so it opens like any other Mac app. Updates arrive inside the app."],
+  ["What's the difference between this and the App Store version?", "It's the same app. The direct version updates itself and Tessera Pro is a license key sent by email. The App Store version uses Apple's in-app purchase. The two purchases are separate."],
+  ["Does Tessera send my tokens anywhere?", "No. Everything happens on your Mac. The only network request is when you choose to fetch keys from an issuer, and that goes straight to the issuer."],
+  ["What do I need?", "A Mac running macOS 15 or later."],
+];
+
+// The newest release, read from the Sparkle appcast at build time so the page never goes stale.
+import appcast from "../../public/tessera/appcast.xml?raw";
+const latest = (() => {
+  const item = appcast.split("<item>")[1] ?? "";
+  const version = item.match(/<sparkle:shortVersionString>([^<]+)</)?.[1];
+  const date = item.match(/<pubDate>([^<]+)</)?.[1];
+  const updated = date ? new Date(date).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : undefined;
+  return { version, updated };
+})();
+
 const shot = (name: string) => ({
   src: `/tessera/screenshots/${name}-1600.webp`,
   srcSet: `/tessera/screenshots/${name}-960.webp 960w, /tessera/screenshots/${name}-1600.webp 1600w`,
@@ -94,6 +114,7 @@ const gallery: { name: string; title: string; caption: string; pro?: boolean }[]
 const salesOpen = import.meta.env.VITE_TESSERA_SALES_OPEN === "1";
 
 export function TesseraPage() {
+  const price = useProPrice(salesOpen);
   return (
     <LightboxProvider>
     <TesseraLayout current="home">
@@ -113,10 +134,10 @@ export function TesseraPage() {
                   Download free for Mac <span aria-hidden="true">↓</span>
                 </a>
                 <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">
-                  Buy Pro <span aria-hidden="true">→</span>
+                  Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span>
                 </a>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
+              <p className="mt-4 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
             </>
           ) : (
             <>
@@ -146,7 +167,7 @@ export function TesseraPage() {
       <aside aria-label="Privacy" className="reveal mt-16 flex flex-col gap-4 rounded-2xl border bg-card p-6 sm:flex-row sm:items-center sm:justify-between md:p-8">
         <div className="flex items-start gap-4">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0 text-tessera-accent" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-          <p className="text-lg leading-relaxed">Everything happens on your Mac. Tokens and keys are never uploaded, there's no account, and the app collects no data.</p>
+          <p className="text-lg leading-relaxed">Production tokens and keys don't belong in a website. Tessera does everything on your Mac: nothing is uploaded, there's no account, and the app collects no data.</p>
         </div>
         <a href={paths.privacy} className="shrink-0 text-sm font-medium text-tessera-accent underline-offset-4 hover:underline">Read the privacy policy →</a>
       </aside>
@@ -213,7 +234,7 @@ export function TesseraPage() {
         <div className="tessera-rule" />
         <p className="eyebrow mt-16">Tessera Pro</p>
         <h2 id="pro-title" className="mt-3 text-4xl font-medium md:text-5xl">More, if you want it.</h2>
-        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">A one-time purchase. No subscription.</p>
+        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">A one-time purchase{price && <> of {price}</>}. No subscription.</p>
         <div className="mt-10 grid gap-6 md:grid-cols-[1fr_1.4fr]">
           <div className="rounded-2xl border bg-card p-7">
             <h3 className="text-2xl font-medium">Free</h3>
@@ -248,7 +269,7 @@ export function TesseraPage() {
             <p className="mt-3 flex-1 leading-relaxed text-muted-foreground">The same app as a download from this site, with updates built in. Tessera Pro is a one-time license key, emailed to you straight away.</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <a href="/tessera/download" className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90">Download <span aria-hidden="true">↓</span></a>
-              <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">Buy Pro <span aria-hidden="true">→</span></a>
+              <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span></a>
             </div>
           </div>
         </div>
@@ -257,6 +278,20 @@ export function TesseraPage() {
         </p>
       </section>
       )}
+      <section aria-labelledby="faq-title" className="reveal pb-24">
+        <div className="tessera-rule" />
+        <p className="eyebrow mt-16">Questions</p>
+        <h2 id="faq-title" className="mt-3 text-4xl font-medium md:text-5xl">Before you download.</h2>
+        <dl className="mt-10 grid gap-x-12 gap-y-8 md:grid-cols-2">
+          {faqs.map(([q, a]) => (
+            <div key={q}>
+              <dt className="text-lg font-medium">{q}</dt>
+              <dd className="mt-2 leading-relaxed text-muted-foreground">{a}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-10 text-sm text-muted-foreground">More answers on the <a href={paths.support} className="text-foreground underline underline-offset-4 hover:text-primary">support page</a>.</p>
+      </section>
     </TesseraLayout>
     </LightboxProvider>
   );

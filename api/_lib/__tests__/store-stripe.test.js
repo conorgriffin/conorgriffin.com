@@ -108,3 +108,26 @@ test("Resend mailer posts JSON with an idempotency key", async () => {
   const failing = createMailer({ apiKey: "x", from: "f", fetch: async () => new Response("no", { status: 422 }) });
   await assert.rejects(failing.send({ to: "a@b.co", subject: "s", text: "t" }));
 });
+
+test("Stripe client: product prices come from the default price and its currency options", async () => {
+  const urls = [];
+  const fake = async (url) => {
+    urls.push(url);
+    if (url.includes("/v1/products/")) return Response.json({ id: "prod_1", default_price: "price_1" });
+    return Response.json({ id: "price_1", currency: "eur", unit_amount: 999,
+      currency_options: { eur: { unit_amount: 999 }, gbp: { unit_amount: 899 }, usd: { unit_amount: 999 } } });
+  };
+  const stripe = createStripe({ secretKey: "sk_test", fetch: fake });
+  assert.deepEqual(await stripe.retrieveProductPrices("prod_1"), { default: "eur", amounts: { eur: 999, gbp: 899, usd: 999 } });
+  assert.equal(urls[1], "https://api.stripe.com/v1/prices/price_1?expand[]=currency_options");
+});
+
+test("Stripe client: product prices fall back to the newest active price when no default is set", async () => {
+  const fake = async (url) => {
+    if (url.includes("/v1/products/")) return Response.json({ id: "prod_1", default_price: null });
+    if (url.includes("/v1/prices?")) return Response.json({ data: [{ id: "price_2" }] });
+    return Response.json({ id: "price_2", currency: "usd", unit_amount: 1299 });
+  };
+  const stripe = createStripe({ secretKey: "sk_test", fetch: fake });
+  assert.deepEqual(await stripe.retrieveProductPrices("prod_1"), { default: "usd", amounts: { usd: 1299 } });
+});

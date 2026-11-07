@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /tessera/admin
+
+Sitemap: https://conorgriffin.com/sitemap.xml
