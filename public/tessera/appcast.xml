@@ -5,5 +5,15 @@
     <link>https://conorgriffin.com/tessera</link>
     <description>Updates for Tessera, the JWT and JWE inspector for Mac.</description>
     <language>en</language>
+    <item>
+      <title>Version 1.0</title>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 07 Nov 2026 20:43:22 +0000</pubDate>
+      <enclosure url="https://github.com/conorgriffin/tessera-releases/releases/download/v1.0/Tessera-1.0.dmg"
+                 sparkle:edSignature="rM9BKoyzrInsGiTVClJufhLwK8b/ciflrE4MeBxit5wTWeviQGwZNgjpSCeaRVpwhjQga9deEAXeIf2kZlEqCw==" length="6723139"
+                 type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
