@@ -85,6 +85,29 @@ export function createStripe({ secretKey, apiVersion, fetch: fetchImpl = fetch }
   }
 
   return {
+    /**
+     * The product's default price in every currency it's sold in, e.g. { default: "eur", amounts: { eur: 999, gbp: 899 } }.
+     * Null if the product or its default price is missing.
+     * @param {string} productId
+     */
+    async retrieveProductPrices(productId) {
+      const product = await call("GET", `/v1/products/${encodeURIComponent(productId)}`);
+      let priceId = typeof product?.default_price === "string" ? product.default_price : product?.default_price?.id;
+      if (!priceId) {
+        // No default set: fall back to the product's newest active price.
+        const list = await call("GET", "/v1/prices", { product: productId, active: true, limit: 1 });
+        priceId = list?.data?.[0]?.id;
+      }
+      if (!priceId) return null;
+      const price = await call("GET", `/v1/prices/${encodeURIComponent(priceId)}`, { expand: ["currency_options"] });
+      if (!price || typeof price.unit_amount !== "number") return null;
+      /** @type {Record<string, number>} */
+      const amounts = { [price.currency]: price.unit_amount };
+      for (const [cur, opt] of Object.entries(price.currency_options ?? {})) {
+        if (typeof (/** @type {any} */ (opt))?.unit_amount === "number") amounts[cur] = /** @type {any} */ (opt).unit_amount;
+      }
+      return { default: price.currency, amounts };
+    },
     /** Checkout Session with line items, or null if Stripe has no such session. @param {string} id */
     retrieveSession: (id) => call("GET", `/v1/checkout/sessions/${encodeURIComponent(id)}`, { expand: ["line_items"] }),
     /** @param {string} id */

@@ -3,8 +3,8 @@
   "framework": "vite",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/tessera/buy", "destination": "/api/tessera/buy" },
-    { "source": "/tessera/download", "destination": "/api/tessera/download" }
+    { "source": "/tessera/buy", "destination": "/api/tessera/go?to=buy" },
+    { "source": "/tessera/download", "destination": "/api/tessera/go?to=download" }
   ],
   "headers": [
     {

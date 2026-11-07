@@ -6,8 +6,9 @@ How Tessera Pro is sold from conorgriffin.com outside the Mac App Store, and wha
 
 | Route | Purpose |
 |---|---|
-| `/tessera/buy` | Rewrite to `/api/tessera/buy`, which 302s to `TESSERA_PAYMENT_LINK_URL` |
-| `/tessera/download` | Rewrite to `/api/tessera/download`, which 302s to `TESSERA_DOWNLOAD_URL` |
+| `/tessera/buy` | Rewrite to `/api/tessera/go?to=buy`, which 302s to `TESSERA_PAYMENT_LINK_URL` |
+| `/tessera/download` | Rewrite to `/api/tessera/go?to=download`, which 302s to `TESSERA_DOWNLOAD_URL` |
+| `/api/tessera/price` | Tessera Pro price in the visitor's currency, from Stripe |
 | `/tessera/thanks` | Success page after paying: shows the license key (copy, open in Tessera, download). It removes `?session_id=` from the address bar as soon as it has read it, so a reload shows "find my license" instead of the key |
 | `/tessera/license` | "Find my license" form (emails the key again) |
 | `/tessera/terms` | Terms of sale |

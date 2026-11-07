@@ -363,7 +363,7 @@ export async function adminLogout(/** @type {() => any} */ getCtx, /** @type {Re
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "Set-Cookie": clearSessionCookie() } });
 }
 
-/** GET /api/tessera/buy and /api/tessera/download: 302 to a URL held in an environment variable. */
+/** GET /api/tessera/go?to=buy|download: 302 to a URL held in an environment variable. */
 export function redirectTo(/** @type {() => any} */ getEnv, /** @type {string} */ name) {
   const url = String(getEnv()[name] ?? "");
   if (!/^https:\/\//.test(url)) return json({ error: "not_configured" }, 503);
@@ -373,4 +373,49 @@ export function redirectTo(/** @type {() => any} */ getEnv, /** @type {string} *
 /** Sales are hidden until launch: VITE_TESSERA_SALES_OPEN=1 (also read at build time by the /tessera page). */
 export function salesOpen(/** @type {Record<string, string | undefined>} */ env) {
   return env.VITE_TESSERA_SALES_OPEN === "1";
+}
+
+// Countries whose own currency we might sell in. Anywhere else gets the price's default currency,
+// which is also what Stripe Checkout shows there.
+const COUNTRY_CURRENCY = /** @type {Record<string, string>} */ ({
+  US: "usd", PR: "usd", GU: "usd", VI: "usd", AS: "usd", MP: "usd",
+  GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp",
+  IE: "eur", AT: "eur", BE: "eur", HR: "eur", CY: "eur", EE: "eur", FI: "eur", FR: "eur", DE: "eur", GR: "eur", IT: "eur",
+  LV: "eur", LT: "eur", LU: "eur", MT: "eur", NL: "eur", PT: "eur", SK: "eur", SI: "eur", ES: "eur",
+  CA: "cad", AU: "aud", NZ: "nzd", CH: "chf", SE: "sek", NO: "nok", DK: "dkk", PL: "pln", JP: "jpy", IN: "inr",
+});
+const PRICE_TTL_MS = 60 * 60 * 1000;
+/** @type {{ at: number, value: { default: string, amounts: Record<string, number> } } | undefined} */
+let priceCache;
+
+/** Test hook: forget the cached Stripe price. */
+export function resetPriceCache() { priceCache = undefined; }
+
+/**
+ * GET /api/tessera/price: Tessera Pro's price in the visitor's currency, from Stripe.
+ * The country comes from Vercel's x-vercel-ip-country header and is never logged or stored.
+ * Returns { currency: "eur", amount: 999 } (amount in the currency's minor unit, as Stripe has it).
+ */
+export async function tesseraPrice(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const { ctx, response } = withContext(getCtx);
+  if (response) return response;
+  if (!salesOpen(ctx.env)) return json({ error: "not_found" }, 404);
+  const productId = ctx.env.TESSERA_STRIPE_PRODUCT_ID;
+  if (!productId) return json({ error: "not_configured" }, 503);
+  try {
+    if (!priceCache || ctx.now() - priceCache.at > PRICE_TTL_MS) {
+      const value = await ctx.stripe.retrieveProductPrices(productId);
+      if (!value) return json({ error: "not_configured" }, 503);
+      priceCache = { at: ctx.now(), value };
+    }
+    const { value } = priceCache;
+    const country = (request.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
+    const local = COUNTRY_CURRENCY[country];
+    const currency = local && local in value.amounts ? local : value.default;
+    // The answer depends on the visitor's country, so it must not be shared from a CDN cache.
+    return json({ currency, amount: value.amounts[currency] }, 200, { "Cache-Control": "private, max-age=3600" });
+  } catch (e) {
+    ctx.log.error("price lookup failed", { error: errName(e) });
+    return json({ error: "try_again" }, 502);
+  }
 }
