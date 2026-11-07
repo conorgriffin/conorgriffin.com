@@ -231,7 +231,7 @@ export function TesseraPage() {
             <p className="mt-3 flex-1 leading-relaxed text-muted-foreground">The same app as a download from this site, with updates built in. Tessera Pro is a one-time license key, emailed to you straight away.</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <a href="/tessera/download" className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90">Download <span aria-hidden="true">↓</span></a>
-              <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">Buy Pro – $9.99</a>
+              <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">Buy Pro <span aria-hidden="true">→</span></a>
             </div>
           </div>
         </div>
