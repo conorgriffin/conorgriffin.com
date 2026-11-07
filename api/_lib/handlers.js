@@ -1,9 +1,10 @@
 // HTTP handlers, written against a context so tests can call them with fakes.
 // The files in api/tessera/ are thin wrappers that pass in the real context.
 import { activationUrl } from "./email.js";
-import { safeEqual, sha256Hex, verifyStripeSignature } from "./crypto.js";
+import { b64urlDecode, safeEqual, sha256Hex, verifyStripeSignature } from "./crypto.js";
 import {
-  SESSION_MAX_AGE_SECONDS, buildRevocationList, handleEvent, issueLicense, reconcile, resendLicenses,
+  SESSION_MAX_AGE_SECONDS, buildRevocationList, findLicenses, handleEvent, issueLicense, reconcile, reissueLicense,
+  resendLicenses, revokeLicense, unrevokeLicense,
 } from "./licensing.js";
 
 /** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
@@ -125,6 +126,97 @@ export async function reconcileHandler(/** @type {() => any} */ getCtx, /** @typ
   } catch (e) {
     ctx.log.error("reconcile failed", { error: errName(e) });
     return json({ error: "reconcile_failed" }, 500);
+  }
+}
+
+// ---------------------------------------------------------------- admin
+
+const LID = /^[0-9a-f]{32}$/;
+const ADMIN_BODY_MAX = 8192;
+const ADMIN_ACTIONS = new Set(["lookup", "revoke", "unrevoke", "reissue"]);
+const ADMIN_REVOKE_REASONS = new Set(["leaked", "manual"]);
+
+/**
+ * Reads an admin target: a licence id, a full licence key (any whitespace; only the payload is read, the
+ * signature is not checked because we only look the id up), or an email address.
+ * @param {unknown} raw
+ * @returns {{ lid: string } | { email: string } | null}
+ */
+export function parseAdminTarget(raw) {
+  if (typeof raw !== "string" || raw.length > 4096) return null;
+  const trimmed = raw.trim();
+  const compact = trimmed.replace(/\s+/g, "");
+  if (compact.startsWith("TSR1-")) {
+    try {
+      const payloadPart = compact.slice(5).split(".")[0];
+      const lid = JSON.parse(b64urlDecode(payloadPart).toString("utf8"))?.lid;
+      return typeof lid === "string" && LID.test(lid) ? { lid } : null;
+    } catch {
+      return null;
+    }
+  }
+  if (LID.test(compact)) return { lid: compact };
+  if (trimmed.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return { email: trimmed.toLowerCase() };
+  return null;
+}
+
+/** @param {any} rec */
+const adminView = (rec) => ({
+  lid: rec.lid,
+  email: rec.email,
+  issuedAt: rec.issuedAt,
+  revokedAt: rec.revokedAt ?? null,
+  revokeReason: rec.revokeReason ?? null,
+  sessionId: rec.sessionId ?? null,
+  paymentIntent: rec.paymentIntent ?? null,
+  emailedAt: rec.emailedAt ?? null,
+  replacedBy: rec.replacedBy ?? null,
+  reissuedFrom: rec.reissuedFrom ?? null,
+}); // never the licence string
+
+/**
+ * POST /api/tessera/admin  { action, target, reason? }, Authorization: Bearer <TESSERA_ADMIN_SECRET>.
+ * Without the secret configured the route does not exist (404 for every method). Nothing here logs emails or keys.
+ */
+export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const { ctx, response } = withContext(getCtx);
+  if (response) return response;
+  const secret = ctx.env.TESSERA_ADMIN_SECRET;
+  if (!secret) return json({ error: "not_found" }, 404);
+  if (!safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return json({ error: "unauthorized" }, 401);
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
+
+  /** @type {any} */
+  let body = null;
+  try {
+    const text = await request.text();
+    if (text.length > ADMIN_BODY_MAX) return json({ error: "too_large" }, 400);
+    body = JSON.parse(text);
+  } catch {
+    return json({ error: "bad_json" }, 400);
+  }
+  const action = body?.action;
+  if (typeof action !== "string" || !ADMIN_ACTIONS.has(action)) return json({ error: "bad_action" }, 400);
+  const target = parseAdminTarget(body?.target);
+  if (!target) return json({ error: "bad_target" }, 400);
+  if (!("lid" in target) && action !== "lookup") return json({ error: "email_only_for_lookup" }, 400);
+  const reason = body?.reason ?? "leaked";
+  if (action === "revoke" && !ADMIN_REVOKE_REASONS.has(reason)) return json({ error: "bad_reason" }, 400);
+
+  try {
+    if (action === "lookup") return json({ licenses: (await findLicenses(ctx, target)).map(adminView) });
+    const lid = /** @type {{ lid: string }} */ (target).lid;
+    if (action === "revoke") return json({ result: await revokeLicense(ctx, lid, reason), lid });
+    if (action === "unrevoke") return json({ lid, ...(await unrevokeLicense(ctx, lid)) });
+    const r = await reissueLicense(ctx, lid);
+    if (r.result === "reissued" || r.result === "already") {
+      // The key is included so it can be pasted to the buyer by hand if the email fails.
+      return json({ result: r.result, oldLid: r.oldLid, newLid: r.newLid, emailed: Boolean(r.record.emailedAt), license: r.record.license });
+    }
+    return json(r);
+  } catch (e) {
+    ctx.log.error("admin action failed", { action, error: errName(e) });
+    return json({ error: "failed" }, 500);
   }
 }
 
