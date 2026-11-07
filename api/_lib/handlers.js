@@ -134,3 +134,8 @@ export function redirectTo(/** @type {() => any} */ getEnv, /** @type {string} *
   if (!/^https:\/\//.test(url)) return json({ error: "not_configured" }, 503);
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });
 }
+
+/** Sales are hidden until launch: VITE_TESSERA_SALES_OPEN=1 (also read at build time by the /tessera page). */
+export function salesOpen(/** @type {Record<string, string | undefined>} */ env) {
+  return env.VITE_TESSERA_SALES_OPEN === "1";
+}

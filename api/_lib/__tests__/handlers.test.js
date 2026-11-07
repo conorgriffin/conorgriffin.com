@@ -230,3 +230,10 @@ test("a context that cannot be built answers 500 not_configured", async () => {
   assert.equal(res.status, 500);
   assert.deepEqual(await res.json(), { error: "not_configured" });
 });
+
+test("sales stay closed unless VITE_TESSERA_SALES_OPEN is 1", async () => {
+  const { salesOpen } = await import("../handlers.js");
+  assert.equal(salesOpen({}), false);
+  assert.equal(salesOpen({ VITE_TESSERA_SALES_OPEN: "0" }), false);
+  assert.equal(salesOpen({ VITE_TESSERA_SALES_OPEN: "1" }), true);
+});

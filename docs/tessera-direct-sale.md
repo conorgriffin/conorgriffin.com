@@ -31,6 +31,7 @@ Set these in Vercel, **Production scope only, marked Sensitive. Never add them t
 | `TESSERA_STRIPE_PRODUCT_ID` | `prod_…` of the Tessera Pro product. Only sessions containing it get a license |
 | `TESSERA_PAYMENT_LINK_URL` | The Payment Link URL (`https://buy.stripe.com/…`) |
 | `TESSERA_DOWNLOAD_URL` | HTTPS URL of the latest DMG (for example a GitHub release asset) |
+| `VITE_TESSERA_SALES_OPEN` | `1` to launch: shows the "Get Tessera" section on /tessera (build time, so redeploy after changing it) and opens /tessera/buy and /tessera/download. Leave unset until launch; test purchases use the Stripe Payment Link URL directly. Not sensitive. |
 | `TESSERA_LICENSE_KID` | `L1` |
 | `TESSERA_LICENSE_PRIVATE_KEY` | L1 private key, PKCS8 DER, base64 |
 | `TESSERA_REVOCATION_KID` | `R1` |

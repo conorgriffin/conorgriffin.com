@@ -89,6 +89,10 @@ const gallery: { name: string; title: string; caption: string; pro?: boolean }[]
   { name: "06-keys", title: "Keys in your Keychain", caption: "Name and tag the keys you use, optionally behind Touch ID.", pro: true },
 ];
 
+// Hidden until launch: set VITE_TESSERA_SALES_OPEN=1 in Vercel (Production) and redeploy to show the
+// "Get Tessera" section. The same variable also opens /tessera/buy and /tessera/download (api/tessera/*).
+const salesOpen = import.meta.env.VITE_TESSERA_SALES_OPEN === "1";
+
 export function TesseraPage() {
   return (
     <LightboxProvider>
@@ -192,7 +196,7 @@ export function TesseraPage() {
         <div className="tessera-rule" />
         <p className="eyebrow mt-16">Tessera Pro</p>
         <h2 id="pro-title" className="mt-3 text-4xl font-medium md:text-5xl">More, if you want it.</h2>
-        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">A one-time purchase. No subscription, and Family Sharing is supported.</p>
+        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">A one-time purchase. No subscription.</p>
         <div className="mt-10 grid gap-6 md:grid-cols-[1fr_1.4fr]">
           <div className="rounded-2xl border bg-card p-7">
             <h3 className="text-2xl font-medium">Free</h3>
@@ -209,6 +213,7 @@ export function TesseraPage() {
         </div>
       </section>
 
+      {salesOpen && (
       <section id="get" aria-labelledby="get-title" className="reveal scroll-mt-24 pb-24">
         <div className="tessera-rule" />
         <p className="eyebrow mt-16">Get Tessera</p>
@@ -216,7 +221,7 @@ export function TesseraPage() {
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <div className="flex flex-col rounded-2xl border bg-card p-7">
             <h3 className="text-2xl font-medium">Mac App Store</h3>
-            <p className="mt-3 flex-1 leading-relaxed text-muted-foreground">Install it from the App Store. Tessera Pro is an in-app purchase, with Family Sharing.</p>
+            <p className="mt-3 flex-1 leading-relaxed text-muted-foreground">Install it from the App Store. Tessera Pro is an in-app purchase.</p>
             <div className="mt-6">
               <span aria-disabled="true" className="inline-flex items-center gap-2 rounded-full bg-tessera-navy px-5 py-2.5 text-sm font-medium text-tessera-ink">Coming soon to the Mac App Store</span>
             </div>
@@ -234,6 +239,7 @@ export function TesseraPage() {
           The two versions are separate purchases: Pro bought in one doesn't unlock the other. Already bought directly? <a href={paths.license} className="text-foreground underline underline-offset-4 hover:text-primary">Find my license</a>. See the <a href={paths.terms} className="text-foreground underline underline-offset-4 hover:text-primary">terms of sale</a>.
         </p>
       </section>
+      )}
     </TesseraLayout>
     </LightboxProvider>
   );
