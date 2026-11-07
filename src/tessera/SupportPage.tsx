@@ -4,7 +4,7 @@ import { TileBullet } from "./TesseraIcon";
 const faqs: [string, string][] = [
   ["Does Tessera send my tokens anywhere?", "No. Everything is processed on your Mac. The only network request is when you choose Fetch keys from issuer, which contacts that issuer directly."],
   ["How do I restore Tessera Pro?", "In the App Store version, open Tessera › Tessera Pro… and choose Restore Purchase, or go to Settings › Purchases."],
-  ["I bought Tessera Pro on your website. How do I get my license again?", "Go to conorgriffin.com/tessera/license and enter the email you bought with. I'll send your license again. Then open Tessera, choose Enter License… and paste it."],
+  ["I bought Tessera Pro on your website. How do I get my license again?", "Go to conorgriffin.com/tessera/license and enter the email you bought with. I'll send your license again. Then open Tessera, go to Settings › Purchases › Enter License… and paste it."],
   ["Is Tessera Pro a subscription?", "No, it's a one-time purchase."],
   ["Which algorithms are supported?", "For signed tokens (JWS): HS256/384/512, RS256/384/512, PS256/384/512, ES256/384/512 and EdDSA. For encrypted tokens (JWE): RSA-OAEP, ECDH-ES (P-256, P-384, P-521, X25519), AES key wrap, PBES2 and direct keys."],
   ["How do I show the menu bar item?", "Settings › General › Show menu bar item (Tessera Pro)."],
