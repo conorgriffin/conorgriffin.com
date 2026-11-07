@@ -12,10 +12,29 @@ export const SESSION_MAX_AGE_SECONDS = 7 * DAY;
 const licKey = (/** @type {string} */ lid) => `lic:${lid}`;
 
 /** @typedef {"refund" | "dispute" | "leaked" | "manual" | "reissued"} RevokeReason */
-/** `replacedBy` is set on a record that was reissued; `reissuedFrom` on the replacement. @typedef {{ lid: string, email: string, license: string, sessionId: string, paymentIntent: string | null, issuedAt: number, revokedAt: number | null, revokeReason: string | null, emailedAt?: number | null, indexedAt?: number | null, replacedBy?: string, reissuedFrom?: string }} LicenseRecord */
+/**
+ * `replacedBy` is set on a record that was reissued; `reissuedFrom` on the replacement. `purchasedAt` is the Checkout
+ * Session's created time (copied into replacements). `paymentRevokedAt` / `paymentRevokeReason` record that the
+ * payment itself was refunded or disputed, separately from `revokeReason` (which is only the first reason).
+ * @typedef {{ lid: string, email: string, license: string, sessionId: string, paymentIntent: string | null, issuedAt: number, purchasedAt?: number, revokedAt: number | null, revokeReason: string | null, paymentRevokedAt?: number | null, paymentRevokeReason?: "refund" | "dispute" | null, emailedAt?: number | null, indexedAt?: number | null, replacedBy?: string, reissuedFrom?: string }} LicenseRecord
+ */
 
 /** Revocations that happen on our side: no email to the customer. */
 const SILENT_REASONS = new Set(["leaked", "manual", "reissued"]);
+
+const isPaymentReason = (/** @type {unknown} */ r) => r === "refund" || r === "dispute";
+
+/**
+ * Whether the payment behind a record was refunded or disputed: the dedicated fields, or (records revoked before
+ * those fields existed) a refund/dispute `revokeReason`.
+ * @param {Partial<LicenseRecord>} rec
+ * @returns {{ reason: "refund" | "dispute", at: number | null } | null}
+ */
+export function paymentRevocation(rec) {
+  if (isPaymentReason(rec.paymentRevokeReason)) return { reason: /** @type {"refund" | "dispute"} */ (rec.paymentRevokeReason), at: rec.paymentRevokedAt ?? rec.revokedAt ?? null };
+  if (rec.revokedAt && isPaymentReason(rec.revokeReason)) return { reason: /** @type {"refund" | "dispute"} */ (rec.revokeReason), at: rec.revokedAt };
+  return null;
+}
 
 /** @returns {Promise<LicenseRecord | null>} */
 export async function getLicense(/** @type {any} */ ctx, /** @type {string} */ lid) {
@@ -52,10 +71,10 @@ const idOf = (/** @type {any} */ v) => (typeof v === "string" ? v : v?.id ?? nul
 /**
  * Generates a fresh licence id, signs the licence and builds the (unsaved) record. Shared by first issue and reissue.
  * @param {any} ctx
- * @param {{ email: string, sessionId: string, paymentIntent: string | null, reissuedFrom?: string }} p
+ * @param {{ email: string, sessionId: string, paymentIntent: string | null, reissuedFrom?: string, purchasedAt?: number }} p
  * @returns {LicenseRecord}
  */
-function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom }) {
+function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom, purchasedAt }) {
   const { env } = ctx;
   const lid = randomLicenseId();
   const issuedAt = nowSeconds(ctx);
@@ -63,7 +82,7 @@ function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom }) {
   /** @type {LicenseRecord} */
   const rec = {
     lid, email, license, sessionId, paymentIntent,
-    issuedAt, revokedAt: null, revokeReason: null, emailedAt: null, indexedAt: null,
+    issuedAt, purchasedAt: purchasedAt ?? issuedAt, revokedAt: null, revokeReason: null, emailedAt: null, indexedAt: null,
   };
   if (reissuedFrom) rec.reissuedFrom = reissuedFrom;
   return rec;
@@ -73,7 +92,9 @@ function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom }) {
  * Issues (or returns) the licence for a Checkout Session. Idempotent per session.
  * @param {any} ctx
  * @param {string} sessionId
- * @param {{ maxAgeSeconds?: number }} [opts]
+ * @param {{ maxAgeSeconds?: number, refuseReissued?: boolean }} [opts] `maxAgeSeconds` is measured from the purchase
+ *   (the Checkout Session's created time), never from a replacement's issue time. `refuseReissued` (public lookups):
+ *   a session whose licence was reissued answers "not_found", so an old thanks-page link never serves the new key.
  * @returns {Promise<{ ok: true, record: LicenseRecord, created: boolean } | { ok: false, reason: "not_found" | "too_old" | "unpaid" | "wrong_product" | "no_email" }>}
  */
 export async function issueLicense(ctx, sessionId, opts = {}) {
@@ -82,7 +103,8 @@ export async function issueLicense(ctx, sessionId, opts = {}) {
   if (existingLid) {
     const rec = await getLicense(ctx, existingLid);
     if (rec) {
-      if (opts.maxAgeSeconds && nowSeconds(ctx) - rec.issuedAt > opts.maxAgeSeconds) return { ok: false, reason: "too_old" };
+      if (opts.refuseReissued && rec.reissuedFrom) return { ok: false, reason: "not_found" };
+      if (opts.maxAgeSeconds && nowSeconds(ctx) - (rec.purchasedAt ?? rec.issuedAt) > opts.maxAgeSeconds) return { ok: false, reason: "too_old" };
       if (rec.revokedAt) return { ok: false, reason: "not_found" };
       if (!rec.indexedAt) await finalize(ctx, rec); // an earlier attempt died part-way
       return { ok: true, record: (await getLicense(ctx, rec.lid)) ?? rec, created: false };
@@ -101,7 +123,8 @@ export async function issueLicense(ctx, sessionId, opts = {}) {
   const email = String(session.customer_details?.email ?? session.customer_email ?? "").trim();
   if (!email) return { ok: false, reason: "no_email" };
 
-  const rec = mintLicense(ctx, { email, sessionId, paymentIntent: idOf(session.payment_intent) });
+  const created = Number(session.created);
+  const rec = mintLicense(ctx, { email, sessionId, paymentIntent: idOf(session.payment_intent), purchasedAt: created > 0 ? created : undefined });
   const lid = rec.lid;
   await putLicense(ctx, rec);
   // Claim the session atomically: if a concurrent call (webhook vs thanks page) won, use its licence.
@@ -175,40 +198,117 @@ export async function retryUnsentEmails(/** @type {any} */ ctx, limit = 50) {
 // ---------------------------------------------------------------- revocation
 
 /**
- * Marks a licence revoked. Idempotent. Refund and dispute email the customer a factual notice; the admin
- * reasons ("leaked", "manual", "reissued") send nothing.
+ * Revokes one record. `primary` marks the record the payment event resolved to: only it gets the customer email and
+ * the Stripe metadata update (chain members share the same payment). For a refund or dispute the payment outcome is
+ * recorded in `paymentRevokedAt` / `paymentRevokeReason` even when the record was already revoked for another reason,
+ * so unrevoke and reissue can still see it.
+ * @param {any} ctx @param {string} lid @param {RevokeReason} reason @param {boolean} primary
+ * @returns {Promise<"revoked" | "already" | "unknown">}
+ */
+async function revokeOne(ctx, lid, reason, primary) {
+  const rec = await getLicense(ctx, lid);
+  if (!rec) return "unknown";
+  const { store } = ctx;
+  const payment = isPaymentReason(reason);
+  const before = paymentRevocation(rec);
+  let changed = false; // something worth reporting (the record newly revoked, or the payment outcome newly recorded)
+  let dirty = false;
+
+  if (payment && !before) {
+    rec.paymentRevokedAt = nowSeconds(ctx);
+    rec.paymentRevokeReason = /** @type {"refund" | "dispute"} */ (reason);
+    changed = dirty = true;
+  } else if (payment && before?.reason === "dispute" && reason === "refund") {
+    // A refund outranks a dispute: a won dispute must not bring the key back.
+    rec.paymentRevokeReason = "refund";
+    rec.paymentRevokedAt ??= before.at;
+    if (rec.revokeReason === "dispute") rec.revokeReason = "refund";
+    dirty = true;
+  }
+
+  if (rec.revokedAt) {
+    // Repair a half-finished earlier revoke; the first reason stays (the payment outcome is kept separately).
+    if (await store.sadd("revoked", lid)) await store.incr("revocations:seq");
+  } else {
+    await store.sadd("revoked", lid);
+    await store.incr("revocations:seq");
+    rec.revokedAt = nowSeconds(ctx);
+    rec.revokeReason = reason;
+    changed = dirty = true;
+  }
+  if (dirty) {
+    await putLicense(ctx, rec);
+    await store.srem("unsent", lid);
+    if (primary) {
+      await setStripeMetadata(ctx, rec.paymentIntent, {
+        license_revoked_at: String(rec.revokedAt),
+        license_revoke_reason: payment ? reason : String(rec.revokeReason),
+      });
+    }
+  }
+  // The customer hears about a refund or dispute once, however many chain members or earlier admin reasons there are.
+  if (primary && payment && !before) {
+    try {
+      await ctx.mailer.send({ to: rec.email, ...revokedEmail(), idempotencyKey: `tessera-revoked-${lid}` });
+    } catch (e) {
+      ctx.log.warn("revocation email failed", { error: errName(e) });
+    }
+  }
+  return changed ? "revoked" : "already";
+}
+
+/** Records connected to `rec` by a reissue: its replacement, the record it replaced, and a reissue claimed but not yet linked. */
+async function chainNeighbours(/** @type {any} */ ctx, /** @type {LicenseRecord} */ rec) {
+  const out = new Set();
+  if (rec.replacedBy) out.add(rec.replacedBy);
+  if (rec.reissuedFrom) out.add(rec.reissuedFrom);
+  const claimed = await ctx.store.get(`reissue:${rec.lid}`);
+  if (claimed) out.add(claimed);
+  return /** @type {string[]} */ ([...out]);
+}
+
+/**
+ * Visits `headLid` and every record connected to it by reissues, head first. `visit` runs (and writes) before the
+ * neighbours are read, so a reissue that claims its replacement meanwhile is either seen here or sees `visit`'s write.
+ * @param {any} ctx @param {string} headLid
+ * @param {(lid: string, primary: boolean) => Promise<LicenseRecord | null>} visit returns the fresh record, or null when unknown
+ */
+async function walkChain(ctx, headLid, visit) {
+  const seen = new Set();
+  const queue = [headLid];
+  while (queue.length && seen.size < 50) {
+    const lid = /** @type {string} */ (queue.shift());
+    if (seen.has(lid)) continue;
+    seen.add(lid);
+    const rec = await visit(lid, lid === headLid);
+    if (rec) queue.push(...(await chainNeighbours(ctx, rec)));
+  }
+}
+
+/**
+ * Marks a licence revoked. Idempotent. Refund and dispute email the customer a factual notice (once) and follow the
+ * reissue chain, so a replacement made before or during the refund is revoked too; the admin reasons ("leaked",
+ * "manual", "reissued") touch only this record and send nothing.
  * @param {any} ctx
  * @param {string} lid
  * @param {RevokeReason} reason
  * @returns {Promise<"revoked" | "already" | "unknown">}
  */
 export async function revokeLicense(ctx, lid, reason) {
-  const rec = await getLicense(ctx, lid);
-  if (!rec) return "unknown";
-  const { store } = ctx;
-  if (rec.revokedAt) {
-    // Repair a half-finished earlier revoke; the first reason stays.
-    if (await store.sadd("revoked", lid)) await store.incr("revocations:seq");
-    return "already";
-  }
-  await store.sadd("revoked", lid);
-  await store.incr("revocations:seq");
-  rec.revokedAt = nowSeconds(ctx);
-  rec.revokeReason = reason;
-  await putLicense(ctx, rec);
-  await store.srem("unsent", lid);
-  await setStripeMetadata(ctx, rec.paymentIntent, { license_revoked_at: String(rec.revokedAt), license_revoke_reason: reason });
-  if (SILENT_REASONS.has(reason)) return "revoked";
-  try {
-    await ctx.mailer.send({ to: rec.email, ...revokedEmail(), idempotencyKey: `tessera-revoked-${lid}` });
-  } catch (e) {
-    ctx.log.warn("revocation email failed", { error: errName(e) });
-  }
-  return "revoked";
+  if (!isPaymentReason(reason)) return revokeOne(ctx, lid, reason, true);
+  /** @type {"revoked" | "already" | "unknown"} */
+  let result = "unknown";
+  await walkChain(ctx, lid, async (member, primary) => {
+    const r = await revokeOne(ctx, member, reason, primary);
+    if (primary) result = r;
+    return r === "unknown" ? null : getLicense(ctx, member);
+  });
+  return result;
 }
 
 /**
- * Un-revokes when the revocation reason is one of `allowed`. No email.
+ * Admin un-revoke when the revocation reason is one of `allowed`. No email. Refused while the payment is refunded or
+ * disputed, whatever reason came first.
  * @param {any} ctx
  * @param {string} lid
  * @param {string[]} allowed
@@ -218,6 +318,8 @@ async function unrevokeWhen(ctx, lid, allowed) {
   const rec = await getLicense(ctx, lid);
   if (!rec) return { result: "unknown" };
   if (!rec.revokedAt) return { result: "skipped", reason: "not_revoked" };
+  const paid = paymentRevocation(rec);
+  if (paid) return { result: "skipped", reason: paid.reason };
   if (!allowed.includes(String(rec.revokeReason))) return { result: "skipped", reason: String(rec.revokeReason) };
   if (rec.replacedBy) return { result: "skipped", reason: "replaced" }; // restoring it would leave two valid keys
   await ctx.store.srem("revoked", lid);
@@ -229,9 +331,37 @@ async function unrevokeWhen(ctx, lid, allowed) {
   return { result: "restored" };
 }
 
-/** Un-revokes, only when the revocation reason was a dispute. No email. @returns {Promise<"restored" | "skipped" | "unknown">} */
+/**
+ * A dispute was won: clears the dispute payment mark on the record and its reissue chain. A record comes back only if
+ * the dispute is the reason it is revoked (never leaked, manual or reissued) and it has not been replaced. A refund
+ * outranks a dispute, so a refunded payment stays revoked. No email.
+ * @returns {Promise<"restored" | "skipped" | "unknown">}
+ */
 export async function unrevokeDisputeLicense(/** @type {any} */ ctx, /** @type {string} */ lid) {
-  return (await unrevokeWhen(ctx, lid, ["dispute"])).result;
+  let known = false;
+  let restored = false;
+  await walkChain(ctx, lid, async (member, primary) => {
+    const rec = await getLicense(ctx, member);
+    if (!rec) return null;
+    if (primary) known = true;
+    if (paymentRevocation(rec)?.reason !== "dispute") return rec;
+    const comesBack = Boolean(rec.revokedAt) && rec.revokeReason === "dispute" && !rec.replacedBy;
+    rec.paymentRevokedAt = null;
+    rec.paymentRevokeReason = null;
+    if (comesBack) {
+      await ctx.store.srem("revoked", member);
+      await ctx.store.incr("revocations:seq");
+      rec.revokedAt = null;
+      rec.revokeReason = null;
+    }
+    await putLicense(ctx, rec);
+    if (comesBack) {
+      restored = true;
+      await setStripeMetadata(ctx, rec.paymentIntent, { license_revoked_at: "", license_revoke_reason: "" });
+    }
+    return rec;
+  });
+  return !known ? "unknown" : restored ? "restored" : "skipped";
 }
 
 /** Admin: restores a licence that was revoked as "leaked" or "manual" (never refund, dispute or reissued). */
@@ -245,7 +375,8 @@ export function unrevokeLicense(/** @type {any} */ ctx, /** @type {string} */ li
  * Replaces a licence with a new one for the same buyer and payment, and revokes the old one ("reissued", no email).
  * Safe to repeat: the replacement is claimed atomically under `reissue:<old lid>`, and every later step is idempotent,
  * so a second call (or a retry after a crash) returns the same replacement and finishes any missed step.
- * Refused when the old licence was revoked for a refund or dispute.
+ * Refused when the payment was refunded or disputed (whatever else the old licence was revoked for), and a replacement
+ * made while a refund or dispute lands is revoked again before it is emailed.
  * @param {any} ctx
  * @param {string} oldLid
  * @returns {Promise<{ result: "reissued" | "already", oldLid: string, newLid: string, record: LicenseRecord } | { result: "refused", oldLid: string, reason: string } | { result: "unknown", oldLid: string }>}
@@ -254,9 +385,8 @@ export async function reissueLicense(ctx, oldLid) {
   const { store } = ctx;
   const old = await getLicense(ctx, oldLid);
   if (!old) return { result: "unknown", oldLid };
-  if (old.revokedAt && (old.revokeReason === "refund" || old.revokeReason === "dispute")) {
-    return { result: "refused", oldLid, reason: String(old.revokeReason) };
-  }
+  const paid = paymentRevocation(old);
+  if (paid) return { result: "refused", oldLid, reason: paid.reason };
 
   /** @type {LicenseRecord | null} */
   let rec = null;
@@ -265,7 +395,7 @@ export async function reissueLicense(ctx, oldLid) {
   if (claimed) {
     rec = await getLicense(ctx, claimed);
   } else {
-    const minted = mintLicense(ctx, { email: old.email, sessionId: old.sessionId, paymentIntent: old.paymentIntent, reissuedFrom: oldLid });
+    const minted = mintLicense(ctx, { email: old.email, sessionId: old.sessionId, paymentIntent: old.paymentIntent, reissuedFrom: oldLid, purchasedAt: old.purchasedAt ?? old.issuedAt });
     await putLicense(ctx, minted);
     if (await store.set(`reissue:${oldLid}`, minted.lid, { nx: true })) {
       rec = minted;
@@ -286,6 +416,13 @@ export async function reissueLicense(ctx, oldLid) {
   if (rec.paymentIntent) await store.set(`pi:${rec.paymentIntent}`, rec.lid);
   if (old.replacedBy !== rec.lid) await patchLicense(ctx, oldLid, (r) => { r.replacedBy = rec.lid; });
   await revokeLicense(ctx, oldLid, "reissued"); // no-op if it was already revoked as leaked/manual
+  // A refund or dispute that landed after `old` was read above revoked the old record but may have missed the
+  // replacement (it was not linked yet): re-read, and revoke the replacement for the same reason before it is emailed.
+  const paidNow = paymentRevocation((await getLicense(ctx, oldLid)) ?? old);
+  if (paidNow) {
+    await revokeOne(ctx, rec.lid, paidNow.reason, false);
+    return { result: "refused", oldLid, reason: paidNow.reason };
+  }
   if (!rec.indexedAt) await finalize(ctx, rec); // email set, Stripe metadata, the new-key email
   else await sendLicenseEmail(ctx, rec.lid); // no-op when already sent
   return { result: created ? "reissued" : "already", oldLid, newLid: rec.lid, record: (await getLicense(ctx, rec.lid)) ?? rec };

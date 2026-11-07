@@ -11,6 +11,9 @@ interface License {
   issuedAt: number;
   revokedAt: number | null;
   revokeReason: string | null;
+  /** The payment itself was refunded or disputed, whatever else revoked the license. */
+  paymentStatus: "refund" | "dispute" | null;
+  paymentRevokedAt: number | null;
   replacedBy: string | null;
   reissuedFrom: string | null;
 }
@@ -54,6 +57,11 @@ const REVOKE_REASONS: Record<string, string> = {
   refund: "refunded",
   dispute: "disputed",
   reissued: "reissued",
+};
+
+const PAYMENT_STATUS: Record<string, string> = {
+  refund: "Refunded",
+  dispute: "Disputed",
 };
 
 const button = "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition disabled:opacity-60";
@@ -100,6 +108,7 @@ function useCopy() {
 export function AdminPage() {
   const [session, setSession] = useState<Session>({ kind: "loading" });
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -126,10 +135,17 @@ export function AdminPage() {
   }, []);
 
   async function signOut() {
+    setSignOutError(null);
     try {
-      await fetch("/api/tessera/admin-logout", { method: "POST" });
+      const res = await fetch("/api/tessera/admin-logout", { method: "POST" });
+      // The server ends the session itself; if it couldn't, stay signed in so this can be retried.
+      if (!res.ok) {
+        setSignOutError("Couldn't sign out. Please try again.");
+        return;
+      }
     } catch {
-      // Falls through: the next session check shows the truth.
+      setSignOutError("Couldn't reach the server to sign out. Please try again.");
+      return;
     }
     setSession({ kind: "out" });
   }
@@ -171,6 +187,7 @@ export function AdminPage() {
               <span aria-hidden="true">·</span>
               <button type="button" onClick={signOut} className="underline underline-offset-4 hover:text-foreground">Sign out</button>
             </p>
+            {signOutError && <p role="alert" className="mt-2 text-sm text-tessera-warn">{signOutError}</p>}
             <Licenses onSignedOut={() => setSession({ kind: "out" })} />
           </>
         )}
@@ -307,12 +324,21 @@ function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
 
 function StatusBadge({ license }: { license: License }) {
   const base = "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium";
-  if (license.replacedBy) return <span className={`${base} border-tessera-panel-line bg-tessera-panel-deep text-tessera-panel-muted`}>Replaced by {shortId(license.replacedBy)}</span>;
-  if (license.revokedAt) {
+  const payment = license.paymentStatus ? (
+    <span className={`${base} border-tessera-warn/50 text-tessera-warn`}>Payment {(PAYMENT_STATUS[license.paymentStatus] ?? license.paymentStatus).toLowerCase()}</span>
+  ) : null;
+  let status: ReactNode;
+  if (license.replacedBy) status = <span className={`${base} border-tessera-panel-line bg-tessera-panel-deep text-tessera-panel-muted`}>Replaced by {shortId(license.replacedBy)}</span>;
+  else if (license.revokedAt) {
     const why = REVOKE_REASONS[String(license.revokeReason)] ?? String(license.revokeReason ?? "revoked");
-    return <span className={`${base} border-tessera-warn/50 text-tessera-warn`}>Revoked: {why}</span>;
-  }
-  return <span className={`${base} border-tessera-accent/50 text-tessera-accent`}>Active</span>;
+    status = <span className={`${base} border-tessera-warn/50 text-tessera-warn`}>Revoked: {why}</span>;
+  } else status = <span className={`${base} border-tessera-accent/50 text-tessera-accent`}>Active</span>;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {status}
+      {payment}
+    </span>
+  );
 }
 
 function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pending["action"]) => void }) {
@@ -320,10 +346,12 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
   const replaced = Boolean(license.replacedBy);
   const revoked = Boolean(license.revokedAt);
   const reason = String(license.revokeReason);
-  const adminRevoked = revoked && (reason === "leaked" || reason === "manual");
+  const paymentStatus = license.paymentStatus;
+  // A refunded or disputed payment can't be undone from here, whatever else revoked the license first.
+  const adminRevoked = revoked && (reason === "leaked" || reason === "manual") && !paymentStatus;
   const canRevoke = !revoked && !replaced;
   const canUnrevoke = adminRevoked && !replaced;
-  const canReissue = !replaced && (!revoked || adminRevoked);
+  const canReissue = !replaced && !paymentStatus && (!revoked || adminRevoked);
 
   return (
     <li className={panel}>
@@ -351,6 +379,12 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
             <dd>{formatDate(license.revokedAt)}</dd>
           </>
         )}
+        {paymentStatus && (
+          <>
+            <dt className="text-tessera-panel-muted">Payment</dt>
+            <dd>{PAYMENT_STATUS[paymentStatus] ?? paymentStatus}{license.paymentRevokedAt ? ` on ${formatDate(license.paymentRevokedAt)}` : ""}</dd>
+          </>
+        )}
       </dl>
       {failed && <p className="mt-3 text-sm text-tessera-warn">Couldn't copy automatically. The full ID is {license.lid}.</p>}
       {(canRevoke || canUnrevoke || canReissue) ? (
@@ -361,7 +395,9 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
         </div>
       ) : (
         <p className="mt-5 text-sm text-tessera-panel-muted">
-          {replaced ? "This license has been replaced; nothing more to do." : "Refunds and disputes are handled by Stripe, so there are no actions here."}
+          {paymentStatus
+            ? `The payment was ${paymentStatus === "refund" ? "refunded" : "disputed"}, so this license stays revoked. Refunds and disputes are handled in Stripe; unrevoke and reissue aren't available.`
+            : replaced ? "This license has been replaced; nothing more to do." : "Refunds and disputes are handled by Stripe, so there are no actions here."}
         </p>
       )}
     </li>

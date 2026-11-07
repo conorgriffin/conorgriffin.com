@@ -117,8 +117,8 @@ test("maxAgeSeconds: sessions older than the window are refused, new and existin
   assert.deepEqual(await issueLicense(ctx, session.id, { maxAgeSeconds: 7 * 86400 }), { ok: false, reason: "too_old" });
   // Without the window (webhook) it is issued; afterwards the thanks route still refuses it.
   assert.equal((await issueLicense(ctx, session.id)).ok, true);
-  const again = await issueLicense(ctx, session.id, { maxAgeSeconds: 7 * 86400 });
-  assert.equal(again.ok, true, "issuedAt is now, so an existing licence for an old session is within the window");
+  // The window runs from the purchase (the Checkout Session's created time), not from when we issued the licence.
+  assert.equal((await issueLicense(ctx, session.id, { maxAgeSeconds: 7 * 86400 })).reason, "too_old");
 });
 
 test("email failure is not fatal; the licence is kept for the retry job", async () => {
