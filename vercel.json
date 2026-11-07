@@ -12,6 +12,14 @@
       "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
     },
     {
+      "source": "/tessera/admin",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
+      ]
+    },
+    {
       "source": "/tessera/thanks",
       "headers": [
         { "key": "Referrer-Policy", "value": "no-referrer" },

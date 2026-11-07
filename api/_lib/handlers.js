@@ -3,6 +3,10 @@
 import { activationUrl } from "./email.js";
 import { b64urlDecode, safeEqual, sha256Hex, verifyStripeSignature } from "./crypto.js";
 import {
+  LOGIN_COOKIE, clearLoginCookie, clearSessionCookie, exchangeCode, googleAdminConfig, loginCookie, originMatches, parseCookies,
+  sessionCookie, sessionEmail, startLogin, verifyIdToken, verifySignedValue,
+} from "./adminAuth.js";
+import {
   SESSION_MAX_AGE_SECONDS, buildRevocationList, findLicenses, handleEvent, issueLicense, reconcile, reissueLicense,
   resendLicenses, revokeLicense, unrevokeLicense,
 } from "./licensing.js";
@@ -175,15 +179,24 @@ const adminView = (rec) => ({
 }); // never the licence string
 
 /**
- * POST /api/tessera/admin  { action, target, reason? }, Authorization: Bearer <TESSERA_ADMIN_SECRET>.
- * Without the secret configured the route does not exist (404 for every method). Nothing here logs emails or keys.
+ * POST /api/tessera/admin  { action, target, reason? }. Two ways in:
+ *  - Authorization: Bearer <TESSERA_ADMIN_SECRET> (the CLI), or
+ *  - the signed `tessera_admin` session cookie from "Sign in with Google", with an Origin header equal to the site's
+ *    origin (CSRF guard on top of SameSite=Strict) and an email that is still in TESSERA_ADMIN_EMAILS.
+ * With neither configured the route does not exist (404 for every method). Nothing here logs emails or keys.
  */
 export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
   const { ctx, response } = withContext(getCtx);
   if (response) return response;
   const secret = ctx.env.TESSERA_ADMIN_SECRET;
-  if (!secret) return json({ error: "not_found" }, 404);
-  if (!safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return json({ error: "unauthorized" }, 401);
+  const google = googleAdminConfig(ctx.env);
+  if (!secret && !google) return json({ error: "not_found" }, 404);
+  /** @type {"bearer" | "cookie" | null} */
+  let via = null;
+  if (secret && safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) via = "bearer";
+  else if (google && sessionEmail(ctx, request)) via = "cookie";
+  if (!via) return json({ error: "unauthorized" }, 401);
+  if (via === "cookie" && google && !originMatches(request, google)) return json({ error: "bad_origin" }, 403);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
 
   /** @type {any} */
@@ -203,6 +216,7 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
   const reason = body?.reason ?? "leaked";
   if (action === "revoke" && !ADMIN_REVOKE_REASONS.has(reason)) return json({ error: "bad_reason" }, 400);
 
+  ctx.log.info("admin action", { action, lid: "lid" in target ? target.lid : null, via });
   try {
     if (action === "lookup") return json({ licenses: (await findLicenses(ctx, target)).map(adminView) });
     const lid = /** @type {{ lid: string }} */ (target).lid;
@@ -218,6 +232,87 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
     ctx.log.error("admin action failed", { action, error: errName(e) });
     return json({ error: "failed" }, 500);
   }
+}
+
+// ---------------------------------------------------------------- admin: Sign in with Google
+
+const ADMIN_PAGE = "/tessera/admin";
+
+/** @param {string} origin @param {string} [error] @param {string[]} cookies */
+function adminRedirect(origin, error, cookies = []) {
+  const headers = new Headers({ Location: `${origin}${ADMIN_PAGE}${error ? `?error=${error}` : ""}`, "Cache-Control": "no-store" });
+  for (const c of cookies) headers.append("Set-Cookie", c);
+  return new Response(null, { status: 302, headers });
+}
+
+/** Shared start of the four routes: the context, and a 404 whatever the verb when Google admin isn't configured. */
+function adminAuthRoute(/** @type {() => any} */ getCtx, /** @type {Request} */ request, /** @type {string} */ method) {
+  const { ctx, response } = withContext(getCtx);
+  if (response) return { response };
+  const cfg = googleAdminConfig(ctx.env);
+  if (!cfg) return { response: json({ error: "not_found" }, 404) };
+  if (request.method !== method) return { response: json({ error: "method_not_allowed" }, 405, { Allow: method }) };
+  return { ctx, cfg };
+}
+
+/** GET /api/tessera/admin-login: sets the short-lived login cookie and sends the browser to Google. */
+export async function adminLogin(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const r = adminAuthRoute(getCtx, request, "GET");
+  if (r.response) return r.response;
+  const { ctx, cfg } = r;
+  const { state, nonce, cv, url } = startLogin(cfg);
+  return new Response(null, {
+    status: 302,
+    headers: { Location: url, "Cache-Control": "no-store", "Set-Cookie": loginCookie({ state, nonce, cv }, cfg.sessionSecret, ctx.now()) },
+  });
+}
+
+/** GET /api/tessera/admin-callback: finishes the Google sign-in. Failures redirect with a short code and leak nothing. */
+export async function adminCallback(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const r = adminAuthRoute(getCtx, request, "GET");
+  if (r.response) return r.response;
+  const { ctx, cfg } = r;
+  /** @param {string} code @param {string} reason */
+  const fail = (code, reason) => {
+    ctx.log.warn("admin sign-in rejected", { reason });
+    return adminRedirect(cfg.origin, code, [clearLoginCookie()]);
+  };
+  const params = new URL(request.url).searchParams;
+  if (params.get("error")) return fail("denied", "google_error");
+  const login = verifySignedValue(parseCookies(request.headers.get("cookie"))[LOGIN_COOKIE], cfg.sessionSecret, "login", ctx.now());
+  const state = params.get("state") ?? "";
+  if (!login || typeof login.state !== "string" || typeof login.nonce !== "string" || typeof login.cv !== "string") return fail("state", "no_login_cookie");
+  if (!state || !safeEqual(state, login.state)) return fail("state", "state_mismatch");
+  const code = params.get("code") ?? "";
+  if (!code || code.length > 2048) return fail("token", "no_code");
+
+  const token = await exchangeCode(ctx, cfg, code, login.cv);
+  if ("reason" in token) return fail("token", token.reason);
+  const verified = await verifyIdToken(ctx, token.idToken, { clientId: cfg.clientId, nonce: login.nonce });
+  if (!verified.ok) return fail("token", `id_token_${verified.reason}`);
+  const claims = verified.claims;
+  if (claims.email_verified !== true) return fail("not_allowed", "email_unverified");
+  const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+  if (!email || !cfg.emails.has(email)) return fail("not_allowed", "not_on_allowlist");
+
+  ctx.log.info("admin signed in", {});
+  return adminRedirect(cfg.origin, undefined, [sessionCookie(email, cfg.sessionSecret, ctx.now()), clearLoginCookie()]);
+}
+
+/** GET /api/tessera/admin-session: who the page is signed in as. */
+export async function adminSession(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const r = adminAuthRoute(getCtx, request, "GET");
+  if (r.response) return r.response;
+  const email = sessionEmail(r.ctx, request);
+  return json(email ? { signedIn: true, email } : { signedIn: false });
+}
+
+/** POST /api/tessera/admin-logout: clears the session cookie. Same-origin only. */
+export async function adminLogout(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const r = adminAuthRoute(getCtx, request, "POST");
+  if (r.response) return r.response;
+  if (!originMatches(request, r.cfg)) return json({ error: "bad_origin" }, 403);
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "Set-Cookie": clearSessionCookie() } });
 }
 
 /** GET /api/tessera/buy and /api/tessera/download: 302 to a URL held in an environment variable. */

@@ -17,7 +17,9 @@ How Tessera Pro is sold from conorgriffin.com outside the Mac App Store, and wha
 | `POST /api/tessera/resend` | Find my license. Always answers `{"ok":true}`; rate limited silently |
 | `GET /api/tessera/revocations` | Signed revocation list the app polls weekly |
 | `GET /api/tessera/reconcile` | Daily Vercel Cron safety net (last 3 days of sessions, refunds, disputes; retries unsent emails) |
-| `POST /api/tessera/admin` | Admin only (`TESSERA_ADMIN_SECRET`): look up, revoke, un-revoke or replace a license. See "Admin: revoke or replace a leaked key". Answers 404 to everything while the secret is unset |
+| `POST /api/tessera/admin` | Admin only: look up, revoke, un-revoke or replace a license. Accepts the `TESSERA_ADMIN_SECRET` bearer token (CLI) or the signed-in Google session cookie (admin page). See "Admin: revoke or replace a leaked key". Answers 404 to everything while neither is configured |
+| `/tessera/admin` | Admin page (not linked from anywhere, `noindex`): "Sign in with Google", then search, revoke, un-revoke and reissue. See "Admin page (Sign in with Google)" |
+| `GET /api/tessera/admin-login`, `GET /api/tessera/admin-callback`, `GET /api/tessera/admin-session`, `POST /api/tessera/admin-logout` | The Google sign-in flow behind the admin page. All four answer 404 until the Google admin variables below are set |
 
 Code lives in `api/_lib/` (shared, not routes) and `api/tessera/` (thin route files). No npm dependencies: Node 22 `crypto` and `fetch` only.
 
@@ -42,7 +44,8 @@ Set these in Vercel, **Production scope only, marked Sensitive. Never add them t
 | `SUPPORT_EMAIL` | Shown in emails; also used as Reply-To |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Added automatically by the Upstash integration |
 | `CRON_SECRET` | Any long random string. Vercel sends it as `Authorization: Bearer …` to the cron route; the route refuses everything if it's unset |
-| `TESSERA_ADMIN_SECRET` | Bearer token for `POST /api/tessera/admin` and the `tessera:admin` CLI. Generate with `openssl rand -hex 32`. **Production only, Sensitive.** Leave it unset to switch the admin route off (it then answers 404 to everything). Keep a copy in your password manager: Sensitive values can't be read back from Vercel |
+| `TESSERA_ADMIN_SECRET` | Bearer token for `POST /api/tessera/admin` and the `tessera:admin` CLI. Generate with `openssl rand -hex 32`. **Production only, Sensitive.** Leave it unset to switch the bearer path off (the admin route answers 404 to everything only if the Google admin variables below are unset too). Keep a copy in your password manager: Sensitive values can't be read back from Vercel |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TESSERA_ADMIN_EMAILS`, `TESSERA_ADMIN_SESSION_SECRET` | The admin page's Google sign-in; see "Admin page (Sign in with Google)". All four are needed; with any one missing the page shows "Admin sign-in isn't configured" |
 | `STRIPE_API_VERSION` | Optional. Leave unset to use the account's default API version (the code reads only long-stable fields). Set it only if you want to pin one |
 
 Private keys never go in a repo or a chat. Generate them with `tools/licensing/keygen.mjs` in the Tessera repo (once each for L1, L2, R1, R2). The public halves go into the app's `ProductionKeys`; the L1 and R1 private halves go into the two variables above. Keep L2 and R2 offline.
@@ -73,9 +76,41 @@ Private keys never go in a repo or a chat. Generate them with `tools/licensing/k
 - **Privacy.** Emails, licenses and IPs are never logged. IPs are only used as hashed, expiring rate-limit keys. The revocations route reads no request headers.
 - **Find my license.** The response is always `{"ok":true}`. It waits at least 0.8 s before answering so timing doesn't reveal whether the address exists. Limits: 3 per address and 10 per IP per hour.
 
+## Admin page (Sign in with Google)
+
+`https://www.conorgriffin.com/tessera/admin` lets you look up a buyer (by email, license key or license ID), revoke, un-revoke and reissue licenses from a browser, behind "Sign in with Google". It does the same things as the CLI, through the same `POST /api/tessera/admin` route. The CLI keeps working and stays the fallback if Google sign-in is down or not set up.
+
+### Google Cloud Console (one time)
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create a project (for example "Tessera admin"), or pick an existing one.
+2. **APIs & Services > OAuth consent screen** (Google may call this "Google Auth platform > Branding / Audience"): user type **External**, app name **Tessera admin**, your email as support and developer contact. Scopes: only the defaults (`openid`, `email`). Publishing status can stay **Testing**; under Test users add the Google account that will sign in (for example `conorgriffin@gmail.com`). Nobody else needs to be able to sign in, and the server also checks the allowlist below.
+3. **APIs & Services > Credentials > Create credentials > OAuth client ID**: application type **Web application**, name "Tessera admin web". Under **Authorized redirect URIs** add exactly `https://www.conorgriffin.com/api/tessera/admin-callback`. No JavaScript origins are needed. Create it and copy the client ID and client secret.
+
+### Vercel environment variables
+
+**Production only. Never add them to Preview.**
+
+| Variable | Value |
+|---|---|
+| `GOOGLE_CLIENT_ID` | The OAuth client ID (`…apps.googleusercontent.com`). Not sensitive |
+| `GOOGLE_CLIENT_SECRET` | The OAuth client secret. **Sensitive** |
+| `TESSERA_ADMIN_EMAILS` | Comma-separated list of Google accounts allowed in, for example `conorgriffin@gmail.com`. Compared lowercase and trimmed, and checked again on every admin request, so removing an address signs that person out at once |
+| `TESSERA_ADMIN_SESSION_SECRET` | Key that signs the login and session cookies, at least 32 characters. Generate with `openssl rand -hex 32`. **Sensitive.** Changing it signs everyone out |
+| `TESSERA_ADMIN_BASE_URL` | Optional. Defaults to `https://www.conorgriffin.com`. The OAuth redirect URI is this plus `/api/tessera/admin-callback`, and the admin API only accepts cookie requests whose `Origin` is this origin |
+
+Redeploy after adding them. With any of the first four missing, `admin-login`, `admin-callback`, `admin-session` and `admin-logout` answer 404 and the page says "Admin sign-in isn't configured".
+
+### How it works
+
+- **Sign in.** `GET /api/tessera/admin-login` makes a random `state`, `nonce` and PKCE verifier, stores them in a signed, `HttpOnly`, `Secure`, `SameSite=Lax` cookie (`tessera_admin_login`, `Path=/api/tessera`, 10 minutes; Lax so it survives Google's redirect back), and redirects to Google (authorization code flow with PKCE S256, scope `openid email`, `prompt=select_account`).
+- **Callback.** `GET /api/tessera/admin-callback` checks `state` against the cookie, swaps the code for tokens at Google (with the client secret and the PKCE verifier), then verifies the ID token itself: RS256 signature against Google's published keys, issuer, audience (your client ID), expiry (60 s of skew), nonce, `email_verified` and that the email is in `TESSERA_ADMIN_EMAILS`. On success it sets the session cookie and redirects to `/tessera/admin`. On failure it redirects to `/tessera/admin?error=denied|state|token|not_allowed` (cancelled at Google, expired or mismatched attempt, token problem, account not allowed) and logs only a short reason, never an email or token.
+- **Session.** `tessera_admin` is an HMAC-signed `{email, exp, v}` cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, valid 8 hours. `GET /api/tessera/admin-session` answers `{"signedIn":true,"email":…}` or `{"signedIn":false}`. `POST /api/tessera/admin-logout` clears it.
+- **Using it.** The page calls `POST /api/tessera/admin`. With a session cookie the request must also carry `Origin: https://www.conorgriffin.com` (browsers add it on their own; this is the CSRF guard on top of `SameSite=Strict`). Each action is logged as `action`, `lid` and `via: cookie|bearer`, with no emails or keys. Reissuing shows the new key on the page (copyable) and says whether the email went out. Keys are only ever sent in request bodies, never in a URL.
+- **Headers.** `vercel.json` serves `/tessera/admin` with `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. The page is not linked from the site or any sitemap.
+
 ## Admin: revoke or replace a leaked key
 
-For when a license key shows up somewhere public, or you need to pull one by hand. Set `TESSERA_ADMIN_SECRET` first (table above; redeploy after adding it), then export it in the shell you use (not on the command line, so it stays out of your history):
+For when a license key shows up somewhere public, or you need to pull one by hand. You can do all of this on the admin page above, or with the CLI. For the CLI, set `TESSERA_ADMIN_SECRET` first (table above; redeploy after adding it), then export it in the shell you use (not on the command line, so it stays out of your history):
 
 ```
 export TESSERA_ADMIN_SECRET=…    # the value you stored in Vercel

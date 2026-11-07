@@ -13,6 +13,7 @@ const pages = {
   thanks: "dist/tessera/thanks/index.html",
   license: "dist/tessera/license/index.html",
   terms: "dist/tessera/terms/index.html",
+  admin: "dist/tessera/admin/index.html",
 };
 
 for (const [id, file] of Object.entries(pages)) {

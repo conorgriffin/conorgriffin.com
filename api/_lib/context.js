@@ -6,6 +6,8 @@ import { createStripe } from "./stripe.js";
 /** Structured logging with a fixed shape. Callers pass names and counts only: never emails, licences or IPs. */
 export const log = {
   /** @param {string} msg @param {Record<string, unknown>} [fields] */
+  info: (msg, fields = {}) => console.log(JSON.stringify({ level: "info", msg, ...fields })),
+  /** @param {string} msg @param {Record<string, unknown>} [fields] */
   warn: (msg, fields = {}) => console.warn(JSON.stringify({ level: "warn", msg, ...fields })),
   /** @param {string} msg @param {Record<string, unknown>} [fields] */
   error: (msg, fields = {}) => console.error(JSON.stringify({ level: "error", msg, ...fields })),
@@ -32,6 +34,7 @@ export function createContext(env = process.env) {
     get stripe() { return stripe(); },
     get mailer() { return mailer(); },
     now: () => Date.now(),
+    fetch: (/** @type {any} */ url, /** @type {any} */ init) => fetch(url, init),
     log,
     resendMinMs: 800,
   };
