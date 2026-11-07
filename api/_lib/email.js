@@ -71,6 +71,38 @@ Conor
   return { subject, text, html };
 }
 
+/** Sent with a replacement key. Deliberately says nothing about why. @param {{ license: string, email: string }} rec @param {string} supportEmail */
+export function reissuedEmail(rec, supportEmail) {
+  const subject = "Your new Tessera Pro license";
+  const text = `Here is your new Tessera Pro license key. Your previous key has been replaced and will stop working, so please use this one from now on.
+
+Your new license key:
+
+${rec.license}
+
+To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
+${activationUrl(rec.license)}
+
+If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
+
+Lost this email? Find your license: ${FIND_LICENSE_URL}
+
+Questions? Reply to this email or write to ${supportEmail}.
+
+Conor
+`;
+  const html = `<!doctype html><html><body style="font-family:-apple-system,Helvetica,Arial,sans-serif;line-height:1.5;color:#1c1d2b;max-width:560px">
+<p>Here is your new Tessera Pro license key. Your previous key has been replaced and will stop working, so please use this one from now on.</p>
+<p>Your new license key:</p>
+<p style="font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:#f3f4f8;padding:12px;border-radius:8px">${esc(rec.license)}</p>
+<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationUrl(rec.license))}">open it in Tessera</a> on your Mac.</p>
+<p>If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.</p>
+<p><a href="${FIND_LICENSE_URL}">Lost this email? Find your license</a></p>
+<p>Questions? Reply to this email or write to <a href="mailto:${esc(supportEmail)}">${esc(supportEmail)}</a>.</p>
+<p>Conor</p></body></html>`;
+  return { subject, text, html };
+}
+
 /** @param {{ license: string }[]} recs @param {string} supportEmail */
 export function resendEmail(recs, supportEmail) {
   const subject = "Your Tessera Pro license";

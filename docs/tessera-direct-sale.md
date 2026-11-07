@@ -17,6 +17,7 @@ How Tessera Pro is sold from conorgriffin.com outside the Mac App Store, and wha
 | `POST /api/tessera/resend` | Find my license. Always answers `{"ok":true}`; rate limited silently |
 | `GET /api/tessera/revocations` | Signed revocation list the app polls weekly |
 | `GET /api/tessera/reconcile` | Daily Vercel Cron safety net (last 3 days of sessions, refunds, disputes; retries unsent emails) |
+| `POST /api/tessera/admin` | Admin only (`TESSERA_ADMIN_SECRET`): look up, revoke, un-revoke or replace a license. See "Admin: revoke or replace a leaked key". Answers 404 to everything while the secret is unset |
 
 Code lives in `api/_lib/` (shared, not routes) and `api/tessera/` (thin route files). No npm dependencies: Node 22 `crypto` and `fetch` only.
 
@@ -41,6 +42,7 @@ Set these in Vercel, **Production scope only, marked Sensitive. Never add them t
 | `SUPPORT_EMAIL` | Shown in emails; also used as Reply-To |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Added automatically by the Upstash integration |
 | `CRON_SECRET` | Any long random string. Vercel sends it as `Authorization: Bearer …` to the cron route; the route refuses everything if it's unset |
+| `TESSERA_ADMIN_SECRET` | Bearer token for `POST /api/tessera/admin` and the `tessera:admin` CLI. Generate with `openssl rand -hex 32`. **Production only, Sensitive.** Leave it unset to switch the admin route off (it then answers 404 to everything). Keep a copy in your password manager: Sensitive values can't be read back from Vercel |
 | `STRIPE_API_VERSION` | Optional. Leave unset to use the account's default API version (the code reads only long-stable fields). Set it only if you want to pin one |
 
 Private keys never go in a repo or a chat. Generate them with `tools/licensing/keygen.mjs` in the Tessera repo (once each for L1, L2, R1, R2). The public halves go into the app's `ProductionKeys`; the L1 and R1 private halves go into the two variables above. Keep L2 and R2 offline.
@@ -71,9 +73,37 @@ Private keys never go in a repo or a chat. Generate them with `tools/licensing/k
 - **Privacy.** Emails, licenses and IPs are never logged. IPs are only used as hashed, expiring rate-limit keys. The revocations route reads no request headers.
 - **Find my license.** The response is always `{"ok":true}`. It waits at least 0.8 s before answering so timing doesn't reveal whether the address exists. Limits: 3 per address and 10 per IP per hour.
 
+## Admin: revoke or replace a leaked key
+
+For when a license key shows up somewhere public, or you need to pull one by hand. Set `TESSERA_ADMIN_SECRET` first (table above; redeploy after adding it), then export it in the shell you use (not on the command line, so it stays out of your history):
+
+```
+export TESSERA_ADMIN_SECRET=…    # the value you stored in Vercel
+npm run tessera:admin -- lookup buyer@example.com
+node scripts/tessera-admin.mjs lookup 0123456789abcdef0123456789abcdef
+node scripts/tessera-admin.mjs revoke 'TSR1-eyJ2…' --reason leaked
+node scripts/tessera-admin.mjs reissue 0123456789abcdef0123456789abcdef
+node scripts/tessera-admin.mjs unrevoke 0123456789abcdef0123456789abcdef
+```
+
+`<target>` is a license id (32 lowercase hex characters, the `lid` shown by `lookup`), a full license key (spaces and line breaks are fine; quote it; the signature is not checked, only the id is read), or, for `lookup` only, the buyer's email. `--base` defaults to `https://www.conorgriffin.com` (use the `www` host: the apex redirects, and a redirected POST is unsafe, so the CLI refuses to follow redirects). The CLI prints the JSON answer and exits non-zero on an HTTP error. Under the hood it is `POST /api/tessera/admin` with `Authorization: Bearer <secret>` and `{"action","target","reason"}`.
+
+| Action | What it does |
+|---|---|
+| `lookup` | Returns `{licenses:[…]}` with `lid`, `email`, `issuedAt`, `revokedAt`, `revokeReason`, `sessionId`, `paymentIntent`, `emailedAt`, `replacedBy`, `reissuedFrom`. Never the key itself |
+| `revoke` | Adds the id to the revocation list and bumps `revocations:seq`. `--reason leaked` (default) or `manual`. No email to the customer. Stripe metadata is updated as for a refund. Answers `revoked`, `already` or `unknown` |
+| `unrevoke` | Restores a license revoked as `leaked` or `manual` (removes it from the list, bumps the seq). Skipped, with the reason, for refunds, disputes (those restore themselves when a dispute is won), `reissued` licenses, and licenses that already have a replacement |
+| `reissue` | Signs a new key for the same email and payment, points `session:<cs_id>` and `pi:<pi_id>` at it, revokes the old one (reason `reissued`, no email), sets the Stripe `license_id` to the new id, and emails the new key ("Your new Tessera Pro license"). The answer includes `license`, so you can paste it to the buyer if the email fails (it is also retried by the daily job). Works on a live key or one you already revoked as `leaked`/`manual`. Refused for refunded or disputed licenses. Safe to repeat: the second call returns `already` with the same replacement and sends nothing |
+
+Typical leak: `lookup` the key, then `reissue` it (that revokes the old one too). To just kill a key with no replacement, `revoke` it.
+
+What the customer sees: a revoked key stops working once the app next fetches the revocation list (it polls about weekly) or on the next update, not instantly. The list itself is CDN-cached for up to 10 minutes. After a reissue, the thanks page and "Find my license" show only the new key, and a later refund or dispute for that payment revokes the new key. Reissue does not ask Stripe whether the payment was already refunded; check the dashboard first if in doubt (a refund that arrives *after* a `leaked`/`manual` revoke keeps the original reason, so `reissue` and `unrevoke` would still work on it).
+
+The route logs no emails or keys. Wrong or missing credentials get 401, and there is no rate limit, so keep the secret long (`openssl rand -hex 32`) and rotate it by changing the variable and redeploying.
+
 ## Redis keys
 
-`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `ignored:<cs_id>` (4-day expiry, sessions for other products), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry).
+`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `reissue:<old lid>` (the replacement's id; claimed atomically so a reissue happens once), `ignored:<cs_id>` (4-day expiry, sessions for other products), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry).
 
 To look at a license by hand, open the Upstash data browser and `GET lic:<lid>`.
 
