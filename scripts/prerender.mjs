@@ -10,6 +10,9 @@ const pages = {
   home: "dist/tessera/index.html",
   privacy: "dist/tessera/privacy/index.html",
   support: "dist/tessera/support/index.html",
+  thanks: "dist/tessera/thanks/index.html",
+  license: "dist/tessera/license/index.html",
+  terms: "dist/tessera/terms/index.html",
 };
 
 for (const [id, file] of Object.entries(pages)) {
