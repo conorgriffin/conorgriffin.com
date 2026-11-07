@@ -14,6 +14,7 @@ const pages = {
   license: "dist/tessera/license/index.html",
   terms: "dist/tessera/terms/index.html",
   admin: "dist/tessera/admin/index.html",
+  guide: "dist/tessera/guide/index.html",
 };
 
 for (const [id, file] of Object.entries(pages)) {

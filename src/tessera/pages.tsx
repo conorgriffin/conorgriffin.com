@@ -7,6 +7,7 @@ import { ThanksPage } from "./ThanksPage";
 import { LicensePage } from "./LicensePage";
 import { TermsPage } from "./TermsPage";
 import { AdminPage } from "./AdminPage";
+import { GuidePage } from "./GuidePage";
 
 export const pages: Record<TesseraPageId, ComponentType> = {
   home: TesseraPage,
@@ -16,4 +17,5 @@ export const pages: Record<TesseraPageId, ComponentType> = {
   license: LicensePage,
   terms: TermsPage,
   admin: AdminPage,
+  guide: GuidePage,
 };

@@ -137,7 +137,10 @@ export function TesseraPage() {
                   Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span>
                 </a>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
+              <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">Pro adds</span> saved keys behind Touch ID, one-click issuer keys, JWE encryption, templates, and a menu bar peek at tokens you copy. <a href="#pro" className="text-foreground underline underline-offset-4 hover:text-primary">See what's in Pro</a>.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
             </>
           ) : (
             <>
@@ -230,7 +233,7 @@ export function TesseraPage() {
         </div>
       </section>
 
-      <section aria-labelledby="pro-title" className="reveal pb-24">
+      <section id="pro" aria-labelledby="pro-title" className="reveal scroll-mt-24 pb-24">
         <div className="tessera-rule" />
         <p className="eyebrow mt-16">Tessera Pro</p>
         <h2 id="pro-title" className="mt-3 text-4xl font-medium md:text-5xl">More, if you want it.</h2>

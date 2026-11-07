@@ -18,6 +18,7 @@ export default defineConfig(({ isSsrBuild }) => ({
             "tessera-license": "tessera/license/index.html",
             "tessera-terms": "tessera/terms/index.html",
             "tessera-admin": "tessera/admin/index.html",
+            "tessera-guide": "tessera/guide/index.html",
           },
         },
       },
