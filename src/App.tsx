@@ -2,6 +2,9 @@ import type { ReactNode } from "react";
 import { SiteHeader, useReveal } from "@/components/site";
 import { experience, education } from "@/content/experience";
 import { apps } from "@/content/apps";
+
+// Same flag as the /tessera page: download links only show once sales are open (Production env).
+const salesOpen = import.meta.env.VITE_TESSERA_SALES_OPEN === "1";
 import { links } from "@/content/site";
 import { now } from "@/content/now";
 import { skills } from "@/content/skills";
@@ -156,7 +159,7 @@ export function App() {
                       className="inline-flex w-fit items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:bg-primary hover:text-primary-foreground">
                       Learn more <span aria-hidden="true">→</span>
                     </a>
-                    {a.download && (
+                    {a.download && salesOpen && (
                       <a href={a.download}
                         className="inline-flex w-fit items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:border-primary/50 hover:text-primary">
                         Download free <span aria-hidden="true">↓</span><span className="sr-only">for Mac</span>
