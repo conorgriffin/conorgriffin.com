@@ -12,10 +12,12 @@
 //   smembers(key): Promise<string[]>
 
 /**
- * @param {{ url: string | undefined, token: string | undefined, fetch?: typeof fetch }} cfg
+ * `namespace` is prepended to every key (e.g. "tessera:"), so one database can serve several products.
+ * @param {{ url: string | undefined, token: string | undefined, namespace?: string, fetch?: typeof fetch }} cfg
  */
-export function createRedisStore({ url, token, fetch: fetchImpl = fetch }) {
+export function createRedisStore({ url, token, namespace = "", fetch: fetchImpl = fetch }) {
   if (!url || !token) throw new Error("KV_REST_API_URL and KV_REST_API_TOKEN are required");
+  const k = (/** @type {string} */ key) => namespace + key;
   const base = url.replace(/\/+$/, "");
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -38,34 +40,34 @@ export function createRedisStore({ url, token, fetch: fetchImpl = fetch }) {
 
   return {
     async get(key) {
-      const v = await run(["GET", key]);
+      const v = await run(["GET", k(key)]);
       return v == null ? null : String(v);
     },
     async set(key, value, { ex, nx } = {}) {
       /** @type {(string | number)[]} */
-      const cmd = ["SET", key, value];
+      const cmd = ["SET", k(key), value];
       if (ex) cmd.push("EX", ex);
       if (nx) cmd.push("NX");
       return (await run(cmd)) === "OK";
     },
     async del(key) {
-      await run(["DEL", key]);
+      await run(["DEL", k(key)]);
     },
     async incr(key) {
-      return Number(await run(["INCR", key]));
+      return Number(await run(["INCR", k(key)]));
     },
     async incrWithExpiry(key, seconds) {
-      const [count] = await pipeline([["INCR", key], ["EXPIRE", key, seconds, "NX"]]);
+      const [count] = await pipeline([["INCR", k(key)], ["EXPIRE", k(key), seconds, "NX"]]);
       return Number(count);
     },
     async sadd(key, member) {
-      return Number(await run(["SADD", key, member]));
+      return Number(await run(["SADD", k(key), member]));
     },
     async srem(key, member) {
-      return Number(await run(["SREM", key, member]));
+      return Number(await run(["SREM", k(key), member]));
     },
     async smembers(key) {
-      return /** @type {string[]} */ (await run(["SMEMBERS", key])) ?? [];
+      return /** @type {string[]} */ (await run(["SMEMBERS", k(key)])) ?? [];
     },
   };
 }

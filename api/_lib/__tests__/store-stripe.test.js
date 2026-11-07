@@ -77,6 +77,22 @@ test("Redis store speaks the Upstash REST protocol", async () => {
   assert.throws(() => createRedisStore({ url: "", token: "" }));
 });
 
+test("Redis store prefixes every key with its namespace", async () => {
+  const calls = [];
+  const fake = async (url, init) => {
+    calls.push(JSON.parse(init.body));
+    if (url.endsWith("/pipeline")) return Response.json([{ result: 1 }, { result: 1 }]);
+    return Response.json({ result: "OK" });
+  };
+  const store = createRedisStore({ url: "https://kv.example", token: "tok", namespace: "tessera:", fetch: fake });
+  await store.set("lic:abc", "v");
+  await store.sadd("revoked", "abc");
+  await store.incrWithExpiry("rl", 60);
+  assert.deepEqual(calls[0], ["SET", "tessera:lic:abc", "v"]);
+  assert.deepEqual(calls[1], ["SADD", "tessera:revoked", "abc"]);
+  assert.deepEqual(calls[2], [["INCR", "tessera:rl"], ["EXPIRE", "tessera:rl", 60, "NX"]]);
+});
+
 test("Redis store surfaces errors without the response body", async () => {
   const store = createRedisStore({ url: "https://kv.example", token: "t", fetch: async () => Response.json({ error: "WRONGPASS secret" }, { status: 401 }) });
   await assert.rejects(store.get("k"), (e) => /401/.test(e.message) && !/WRONGPASS/.test(e.message));

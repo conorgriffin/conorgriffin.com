@@ -23,7 +23,7 @@ export function createContext(env = process.env) {
     /** @type {T | undefined} */ let v;
     return () => (v ??= make());
   };
-  const store = lazy(() => createRedisStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN }));
+  const store = lazy(() => createRedisStore({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN, namespace: "tessera:" }));
   const stripe = lazy(() => createStripe({ secretKey: env.STRIPE_SECRET_KEY, apiVersion: env.STRIPE_API_VERSION || undefined }));
   const mailer = lazy(() => createMailer({ apiKey: env.RESEND_API_KEY, from: env.RESEND_FROM, replyTo: env.SUPPORT_EMAIL || undefined }));
   return {
