@@ -363,7 +363,7 @@ export async function adminLogout(/** @type {() => any} */ getCtx, /** @type {Re
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "Set-Cookie": clearSessionCookie() } });
 }
 
-/** GET /api/tessera/buy and /api/tessera/download: 302 to a URL held in an environment variable. */
+/** GET /api/tessera/go?to=buy|download: 302 to a URL held in an environment variable. */
 export function redirectTo(/** @type {() => any} */ getEnv, /** @type {string} */ name) {
   const url = String(getEnv()[name] ?? "");
   if (!/^https:\/\//.test(url)) return json({ error: "not_configured" }, 503);
