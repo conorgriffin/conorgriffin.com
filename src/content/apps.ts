@@ -7,6 +7,8 @@ export type App = {
   blurb: string;
   url: string; // "#" until a website exists; a path like "/tessera" links to a page on this site
   status?: string;
+  /** A direct download on this site, shown as a second button beside "Learn more". */
+  download?: string;
 };
 
 export const apps: App[] = [
@@ -17,7 +19,8 @@ export const apps: App[] = [
     blurb:
       "Decode and verify JWT and JWE tokens on your Mac, with a clear verdict, a live expiry countdown and plain-English security checks. Nothing leaves your machine.",
     url: "/tessera",
-    status: "Coming soon to the Mac App Store",
+    status: "Free download for Mac. Coming soon to the Mac App Store.",
+    download: "/tessera/download",
   },
   {
     name: "ChessMates",
