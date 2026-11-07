@@ -105,14 +105,31 @@ export function TesseraPage() {
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground md:text-xl">
             A native Mac app for reading, verifying and building JSON Web Tokens. Paste a JWT or JWE and it answers the question you actually have: <em className="font-display text-foreground">is this token valid, and if not, why?</em>
           </p>
-          <p className="mt-5 text-sm text-muted-foreground">Free on the Mac App Store, with an optional one-time Tessera Pro upgrade. No subscription. Prefer to skip the store? <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Download it directly</a>.</p>
-          <div className="mt-6 flex flex-wrap items-center gap-4">
-            <span aria-disabled="true" className="inline-flex items-center gap-2 rounded-full bg-tessera-navy px-5 py-2.5 text-sm font-medium text-tessera-ink">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8C7 7.2 5.6 8.1 4.8 9.5c-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.3 2.8 2.3 1.1-.1 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.7-2.2c.9-1.3 1.2-2.5 1.2-2.6 0 0-2.3-.9-2.2-3.6ZM14.2 5.6c.6-.7 1-1.7.9-2.6-.9 0-1.9.6-2.5 1.3-.6.6-1.1 1.6-.9 2.5 1 .1 1.9-.5 2.5-1.2Z" /></svg>
-              Coming soon to the Mac App Store
-            </span>
-            <span className="text-sm text-muted-foreground">Requires macOS 15 or later</span>
-          </div>
+          {salesOpen ? (
+            <>
+              <p className="mt-5 text-sm text-muted-foreground">Free to download, with an optional one-time Tessera Pro upgrade. No subscription, no account.</p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <a href="/tessera/download" className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90">
+                  Download free for Mac <span aria-hidden="true">↓</span>
+                </a>
+                <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">
+                  Buy Pro <span aria-hidden="true">→</span>
+                </a>
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground">Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-5 text-sm text-muted-foreground">Free on the Mac App Store, with an optional one-time Tessera Pro upgrade. No subscription.</p>
+              <div className="mt-6 flex flex-wrap items-center gap-4">
+                <span aria-disabled="true" className="inline-flex items-center gap-2 rounded-full bg-tessera-navy px-5 py-2.5 text-sm font-medium text-tessera-ink">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8C7 7.2 5.6 8.1 4.8 9.5c-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.3 2.8 2.3 1.1-.1 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.7-2.2c.9-1.3 1.2-2.5 1.2-2.6 0 0-2.3-.9-2.2-3.6ZM14.2 5.6c.6-.7 1-1.7.9-2.6-.9 0-1.9.6-2.5 1.3-.6.6-1.1 1.6-.9 2.5 1 .1 1.9-.5 2.5-1.2Z" /></svg>
+                  Coming soon to the Mac App Store
+                </span>
+                <span className="text-sm text-muted-foreground">Requires macOS 15 or later</span>
+              </div>
+            </>
+          )}
         </div>
         <figure className="mt-14 md:mt-20">
           <div className="dark:hidden">

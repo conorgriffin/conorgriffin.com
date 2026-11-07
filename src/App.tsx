@@ -151,10 +151,18 @@ export function App() {
                 <p className="mt-3 flex-1 leading-relaxed text-muted-foreground">{a.blurb}</p>
                 {a.status && <p className="mt-4 text-sm font-medium">{a.status}</p>}
                 {a.url.startsWith("/") ? (
-                  <a href={a.url}
-                    className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:bg-primary hover:text-primary-foreground">
-                    Learn more <span aria-hidden="true">→</span>
-                  </a>
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <a href={a.url}
+                      className="inline-flex w-fit items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:bg-primary hover:text-primary-foreground">
+                      Learn more <span aria-hidden="true">→</span>
+                    </a>
+                    {a.download && (
+                      <a href={a.download}
+                        className="inline-flex w-fit items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:border-primary/50 hover:text-primary">
+                        Download free <span aria-hidden="true">↓</span><span className="sr-only">for Mac</span>
+                      </a>
+                    )}
+                  </div>
                 ) : a.url !== "#" ? (
                   <a href={a.url} target="_blank" rel="noopener noreferrer"
                     className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:bg-primary hover:text-primary-foreground">
