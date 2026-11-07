@@ -47,7 +47,7 @@ Your license key:
 
 ${rec.license}
 
-To activate, open Tessera, choose Enter License… and paste the key. Or open this link on your Mac:
+To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
 ${activationUrl(rec.license)}
 
 If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
@@ -63,7 +63,7 @@ Conor
 <p>Thanks for buying Tessera Pro.</p>
 <p>Your license key:</p>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:#f3f4f8;padding:12px;border-radius:8px">${esc(rec.license)}</p>
-<p>To activate, open Tessera, choose <strong>Enter License…</strong> and paste the key. Or <a href="${esc(activationUrl(rec.license))}">open it in Tessera</a> on your Mac.</p>
+<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationUrl(rec.license))}">open it in Tessera</a> on your Mac.</p>
 <p>If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.</p>
 <p><a href="${DOWNLOAD_URL}">Download Tessera</a> · <a href="${FIND_LICENSE_URL}">Lost this email? Find your license</a></p>
 <p>Questions? Reply to this email or write to <a href="mailto:${esc(supportEmail)}">${esc(supportEmail)}</a>.</p>
@@ -79,7 +79,7 @@ export function resendEmail(recs, supportEmail) {
 
 ${recs.map((r) => licenseBlockText(r)).join("\n\n---\n\n")}
 
-To activate, open Tessera, choose Enter License… and paste the key. Tessera ignores line breaks and spaces.
+To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Tessera ignores line breaks and spaces.
 
 Download Tessera: ${DOWNLOAD_URL}
 Questions? Reply to this email or write to ${supportEmail}.
@@ -94,7 +94,7 @@ ${recs
 <p><a href="${esc(activationUrl(r.license))}">Open in Tessera</a></p>`,
   )
   .join("\n")}
-<p>To activate, open Tessera, choose <strong>Enter License…</strong> and paste the key. Tessera ignores line breaks and spaces.</p>
+<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Tessera ignores line breaks and spaces.</p>
 <p><a href="${DOWNLOAD_URL}">Download Tessera</a></p>
 <p>Questions? Reply to this email or write to <a href="mailto:${esc(supportEmail)}">${esc(supportEmail)}</a>.</p>
 <p>Conor</p></body></html>`;

@@ -99,7 +99,7 @@ export function ThanksPage() {
           <h2 id="steps-title" className="text-2xl font-medium md:text-3xl">How to activate</h2>
           <ol className="mt-4 list-decimal space-y-3 pl-6 text-lg leading-relaxed text-muted-foreground">
             <li>Download and open Tessera, if you haven't already.</li>
-            <li>Choose <strong className="font-medium text-foreground">Enter License…</strong> in Tessera Pro, or press Open in Tessera above.</li>
+            <li>In Tessera, go to <strong className="font-medium text-foreground">Settings › Purchases › Enter License…</strong>, or press Open in Tessera above.</li>
             <li>Paste your key and press Activate.</li>
           </ol>
           <p className="mt-6 text-muted-foreground">Lost the key later? <a href={paths.license} className="text-foreground underline underline-offset-4 hover:text-primary">Find my license</a> any time. Please don't share it: it's tied to your purchase.</p>
