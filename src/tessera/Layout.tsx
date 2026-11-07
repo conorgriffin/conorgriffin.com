@@ -3,7 +3,7 @@ import { SiteHeader, useReveal } from "@/components/site";
 import { links } from "@/content/site";
 import { TesseraIcon } from "./TesseraIcon";
 
-export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "license" | "terms";
+export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "license" | "terms" | "admin";
 
 export const paths: Record<TesseraPageId, string> = {
   home: "/tessera",
@@ -12,6 +12,7 @@ export const paths: Record<TesseraPageId, string> = {
   thanks: "/tessera/thanks",
   license: "/tessera/license",
   terms: "/tessera/terms",
+  admin: "/tessera/admin",
 };
 
 export const email = links.email.replace(/^mailto:/, "");

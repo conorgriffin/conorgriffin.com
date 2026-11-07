@@ -98,7 +98,7 @@ export function makeCtx(overrides = {}) {
     stripe: makeStripe(),
     mailer: makeMailer(),
     now: () => NOW_MS,
-    log: { warn: record("warn"), error: record("error") },
+    log: { info: record("info"), warn: record("warn"), error: record("error") },
     logs,
     resendMinMs: 0,
     ...overrides,
