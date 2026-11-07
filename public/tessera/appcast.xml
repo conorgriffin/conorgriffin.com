@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Tessera</title>
+    <link>https://conorgriffin.com/tessera</link>
+    <description>Updates for Tessera, the JWT and JWE inspector for Mac.</description>
+    <language>en</language>
+  </channel>
+</rss>

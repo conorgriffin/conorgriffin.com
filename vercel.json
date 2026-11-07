@@ -1,5 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/tessera/buy", "destination": "/api/tessera/buy" },
+    { "source": "/tessera/download", "destination": "/api/tessera/download" }
+  ],
+  "headers": [
+    {
+      "source": "/tessera/appcast.xml",
+      "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
+    },
+    {
+      "source": "/tessera/thanks",
+      "headers": [
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ],
+  "crons": [{ "path": "/api/tessera/reconcile", "schedule": "17 4 * * *" }]
 }

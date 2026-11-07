@@ -3,12 +3,15 @@ import { SiteHeader, useReveal } from "@/components/site";
 import { links } from "@/content/site";
 import { TesseraIcon } from "./TesseraIcon";
 
-export type TesseraPageId = "home" | "privacy" | "support";
+export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "license" | "terms";
 
 export const paths: Record<TesseraPageId, string> = {
   home: "/tessera",
   privacy: "/tessera/privacy",
   support: "/tessera/support",
+  thanks: "/tessera/thanks",
+  license: "/tessera/license",
+  terms: "/tessera/terms",
 };
 
 export const email = links.email.replace(/^mailto:/, "");
@@ -40,11 +43,21 @@ export function TesseraLayout({ current, children }: { current: TesseraPageId; c
           </div>
           <ul className="flex gap-6 text-sm">
             <li><a href={paths.privacy} className="underline-offset-4 hover:text-primary hover:underline">Privacy policy</a></li>
+            <li><a href={paths.terms} className="underline-offset-4 hover:text-primary hover:underline">Terms of sale</a></li>
             <li><a href={paths.support} className="underline-offset-4 hover:text-primary hover:underline">Support</a></li>
           </ul>
         </div>
       </footer>
     </div>
+  );
+}
+
+export function Part({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
+  return (
+    <section id={id} className="mt-12 scroll-mt-24">
+      <h2 className="text-2xl font-medium md:text-3xl">{title}</h2>
+      <div className="mt-4 space-y-4 text-lg leading-relaxed text-muted-foreground">{children}</div>
+    </section>
   );
 }
 
