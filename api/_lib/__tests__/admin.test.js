@@ -132,13 +132,15 @@ test("lookup by lid, by license key and by email returns admin fields and never 
     assert.equal(res.status, 200);
     const text = await res.text();
     assert.ok(!text.includes("TSR1-"), "no licence string in the response");
+    assert.ok(!text.includes(session.id) && !text.includes("pi_1"), "no Checkout Session id (a bearer for the key) or PaymentIntent id");
+    assert.ok(!("sessionId" in JSON.parse(text).licenses[0]) && !("paymentIntent" in JSON.parse(text).licenses[0]));
     const { licenses } = JSON.parse(text);
     assert.equal(licenses.length, 1);
     assert.deepEqual(
       { ...licenses[0], issuedAt: undefined, emailedAt: undefined },
       {
         lid: rec.lid, email: "Buyer@Example.com", issuedAt: undefined, revokedAt: null, revokeReason: null,
-        sessionId: session.id, paymentIntent: "pi_1", emailedAt: undefined, replacedBy: null, reissuedFrom: null,
+        paymentStatus: null, paymentRevokedAt: null, emailedAt: undefined, replacedBy: null, reissuedFrom: null,
       },
     );
     assert.equal(typeof licenses[0].issuedAt, "number");

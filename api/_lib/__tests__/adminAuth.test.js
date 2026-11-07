@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { test } from "node:test";
-import { GOOGLE_AUTH_URL, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, googleAdminConfig, parseCookies, signValue, verifySignedValue } from "../adminAuth.js";
+import { GOOGLE_AUTH_URL, GOOGLE_JWKS_URL, GOOGLE_TOKEN_URL, googleAdminConfig, parseCookies, signValue, startSession, verifySignedValue } from "../adminAuth.js";
 import { adminCallback, adminHandler, adminLogin, adminLogout, adminSession } from "../handlers.js";
 import { issueLicense } from "../licensing.js";
 import { NOW_MS, makeCtx, makeSession } from "./helpers.js";
@@ -82,8 +82,15 @@ async function signIn(tweak = {}, { ctx: c, google: g } = configuredCtx()) {
   return { res, ctx, google, s };
 }
 const errorOf = (res) => new URL(res.headers.get("location")).searchParams.get("error");
-const sessionOf = (res) => cookieOf(res, "tessera_admin");
-const asSession = (value) => ({ cookie: `tessera_admin=${value}` });
+const SESSION_COOKIE = "__Host-tessera_admin";
+const sessionOf = (res) => cookieOf(res, SESSION_COOKIE);
+const asSession = (value) => ({ cookie: `${SESSION_COOKIE}=${value}` });
+
+/** A live session as the callback would create it: a Redis entry plus the signed cookie value. */
+async function sessionFor(ctx, email = ADMIN, { exp = Math.floor(ctx.now() / 1000) + 3600 } = {}) {
+  const { sid } = await startSession(ctx, email);
+  return { sid, value: signValue({ email, sid, exp, v: 2 }, SESSION_SECRET, "session") };
+}
 
 // ------------------------------------------------------------------ configuration
 
@@ -196,7 +203,12 @@ test("callback success: exchanges the code with PKCE + secret, sets the session 
   assert.match(session.line, /; Secure/);
   assert.match(session.line, /; SameSite=Strict$/);
   const payload = verifySignedValue(session.value, SESSION_SECRET, "session", NOW_MS);
-  assert.deepEqual(payload, { email: ADMIN, exp: Math.floor(NOW_MS / 1000) + 8 * 3600, v: 1 });
+  assert.deepEqual({ ...payload, sid: undefined }, { email: ADMIN, sid: undefined, exp: Math.floor(NOW_MS / 1000) + 8 * 3600, v: 2 });
+  assert.match(payload.sid, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(ctx.store.strings.get(`adminsess:${payload.sid}`), ADMIN, "the session is live in Redis");
+  assert.equal(ctx.store.ttls.get(`adminsess:${payload.sid}`), 8 * 3600);
+  assert.ok(!session.line.includes("Domain="));
+  assert.ok(session.line.startsWith("__Host-tessera_admin="));
   assert.match(cookieOf(res, "tessera_admin_login").line, /Max-Age=0/);
   // Nothing sensitive in the logs.
   assert.ok(!JSON.stringify(ctx.logs).includes(ADMIN));
@@ -313,8 +325,7 @@ test("JWKS is cached, and refetched once when the kid is unknown (key rotation)"
 // ------------------------------------------------------------------ session + logout
 
 test("admin-session: signed out without a cookie, signed in with a valid one, never cached", async () => {
-  const { res } = await signIn();
-  const { ctx } = configuredCtx();
+  const { res, ctx } = await signIn();
   const none = await adminSession(() => ctx, get("admin-session"));
   assert.deepEqual(await none.json(), { signedIn: false });
   assert.equal(none.headers.get("cache-control"), "no-store");
@@ -323,35 +334,109 @@ test("admin-session: signed out without a cookie, signed in with a valid one, ne
   assert.equal(ok.headers.get("cache-control"), "no-store");
 });
 
-test("admin-session: tampered, expired, wrong-secret, login-purpose and de-listed sessions are signed out", async () => {
+test("admin-session: tampered, expired, wrong-secret, login-purpose, old-format and de-listed sessions are signed out", async () => {
   const { ctx } = configuredCtx();
   const exp = Math.floor(NOW_MS / 1000) + 3600;
-  const good = signValue({ email: ADMIN, exp, v: 1 }, SESSION_SECRET, "session");
+  const { sid, value: good } = await sessionFor(ctx);
+  const sign = (payload, secret = SESSION_SECRET, purpose = "session") => signValue(payload, secret, purpose);
   const check = async (value, c = ctx) => (await (await adminSession(() => c, get("admin-session", asSession(value)))).json()).signedIn;
   assert.equal(await check(good), true);
   const [, sig] = good.split(".");
-  assert.equal(await check(`${b64u({ email: "other@example.com", exp, v: 1 })}.${sig}`), false); // tampered
-  assert.equal(await check(signValue({ email: ADMIN, exp: Math.floor(NOW_MS / 1000) - 1, v: 1 }, SESSION_SECRET, "session")), false); // expired
-  assert.equal(await check(signValue({ email: ADMIN, exp, v: 1 }, "z".repeat(40), "session")), false);
-  assert.equal(await check(signValue({ email: ADMIN, exp, v: 1 }, SESSION_SECRET, "login")), false);
-  assert.equal(await check(signValue({ email: ADMIN, exp, v: 2 }, SESSION_SECRET, "session")), false);
-  assert.equal(await check(signValue({ email: 5, exp, v: 1 }, SESSION_SECRET, "session")), false);
-  assert.equal(await check(signValue({ email: "gone@example.com", exp, v: 1 }, SESSION_SECRET, "session")), false); // not (or no longer) allowlisted
+  assert.equal(await check(`${b64u({ email: "other@example.com", sid, exp, v: 2 })}.${sig}`), false); // tampered
+  assert.equal(await check(sign({ email: ADMIN, sid, exp: Math.floor(NOW_MS / 1000) - 1, v: 2 })), false); // expired
+  assert.equal(await check(sign({ email: ADMIN, sid, exp, v: 2 }, "z".repeat(40))), false);
+  assert.equal(await check(sign({ email: ADMIN, sid, exp, v: 2 }, SESSION_SECRET, "login")), false);
+  assert.equal(await check(sign({ email: ADMIN, sid, exp, v: 1 })), false); // the old cookie format had no session id
+  assert.equal(await check(sign({ email: ADMIN, exp, v: 2 })), false);
+  assert.equal(await check(sign({ email: ADMIN, sid: "short", exp, v: 2 })), false);
+  assert.equal(await check(sign({ email: ADMIN, sid: 5, exp, v: 2 })), false);
+  assert.equal(await check(sign({ email: 5, sid, exp, v: 2 })), false);
+  const gone = await sessionFor(ctx, "gone@example.com");
+  assert.equal(await check(gone.value), false); // not (or no longer) allowlisted
   const later = { ...ctx, now: () => (exp + 1) * 1000 };
   assert.equal(await check(good, later), false);
 });
 
-test("admin-logout: POST with the right Origin clears the cookie (204); wrong or missing Origin is 403", async () => {
+test("admin-session: a correctly signed cookie whose session id is not in Redis (never created, expired, deleted) is signed out", async () => {
   const { ctx } = configuredCtx();
+  const exp = Math.floor(NOW_MS / 1000) + 3600;
+  const ghost = signValue({ email: ADMIN, sid: "A".repeat(43), exp, v: 2 }, SESSION_SECRET, "session");
+  const check = async (value) => (await (await adminSession(() => ctx, get("admin-session", asSession(value)))).json()).signedIn;
+  assert.equal(await check(ghost), false);
+  const live = await sessionFor(ctx);
+  assert.equal(await check(live.value), true);
+  ctx.store.strings.delete(`adminsess:${live.sid}`); // Redis TTL ran out, or someone deleted the key
+  assert.equal(await check(live.value), false);
+  // A session stored for a different email does not authenticate this cookie.
+  const other = await sessionFor(ctx);
+  ctx.store.strings.set(`adminsess:${other.sid}`, "other@example.com");
+  assert.equal(await check(other.value), false);
+});
+
+test("admin-session: fails closed when Redis is unreachable", async () => {
+  const { ctx } = configuredCtx();
+  const live = await sessionFor(ctx);
+  ctx.store.get = async () => { throw new Error("redis down"); };
+  const res = await adminSession(() => ctx, get("admin-session", asSession(live.value)));
+  assert.deepEqual(await res.json(), { signedIn: false });
+});
+
+test("admin-logout: POST with the right Origin deletes the session and clears the cookie (204); wrong or missing Origin is 403 and changes nothing", async () => {
+  const { ctx } = configuredCtx();
+  const live = await sessionFor(ctx);
   const post = (headers) => adminLogout(() => ctx, new Request(`${ORIGIN}/api/tessera/admin-logout`, { method: "POST", headers }));
-  const ok = await post({ origin: ORIGIN });
-  assert.equal(ok.status, 204);
-  assert.match(cookieOf(ok, "tessera_admin").line, /^tessera_admin=; Max-Age=0; Path=\/; HttpOnly; Secure; SameSite=Strict$/);
   for (const headers of [{}, { origin: "https://evil.example.com" }, { origin: "http://www.conorgriffin.com" }, { origin: "null" }]) {
-    const res = await post(headers);
+    const res = await post({ ...headers, ...asSession(live.value) });
     assert.equal(res.status, 403);
     assert.equal(res.headers.get("set-cookie"), null);
+    assert.ok(ctx.store.strings.has(`adminsess:${live.sid}`), "a rejected logout leaves the session alone");
   }
+  const ok = await post({ origin: ORIGIN, ...asSession(live.value) });
+  assert.equal(ok.status, 204);
+  assert.match(cookieOf(ok, SESSION_COOKIE).line, /^__Host-tessera_admin=; Max-Age=0; Path=\/; HttpOnly; Secure; SameSite=Strict$/);
+  assert.ok(!ctx.store.strings.has(`adminsess:${live.sid}`));
+  // The copied cookie value is dead now, even though its signature and expiry are fine.
+  const after = await adminSession(() => ctx, get("admin-session", asSession(live.value)));
+  assert.deepEqual(await after.json(), { signedIn: false });
+  // Logging out without a session, or with junk, still just clears the cookie.
+  assert.equal((await post({ origin: ORIGIN })).status, 204);
+  assert.equal((await post({ origin: ORIGIN, ...asSession("junk.junk") })).status, 204);
+});
+
+test("admin-logout: a forged cookie cannot delete someone else's session", async () => {
+  const { ctx } = configuredCtx();
+  const live = await sessionFor(ctx);
+  const forged = signValue({ email: ADMIN, sid: live.sid, exp: Math.floor(NOW_MS / 1000) + 60, v: 2 }, "z".repeat(40), "session");
+  const res = await adminLogout(() => ctx, new Request(`${ORIGIN}/api/tessera/admin-logout`, { method: "POST", headers: { origin: ORIGIN, ...asSession(forged) } }));
+  assert.equal(res.status, 204);
+  assert.ok(ctx.store.strings.has(`adminsess:${live.sid}`));
+});
+
+test("admin-logout: if Redis can't delete the session it says so (500) and keeps the cookie so the admin can retry", async () => {
+  const { ctx } = configuredCtx();
+  const live = await sessionFor(ctx);
+  ctx.store.del = async () => { throw new Error("redis down"); };
+  const res = await adminLogout(() => ctx, new Request(`${ORIGIN}/api/tessera/admin-logout`, { method: "POST", headers: { origin: ORIGIN, ...asSession(live.value) } }));
+  assert.equal(res.status, 500);
+  assert.equal(res.headers.get("set-cookie"), null);
+});
+
+test("two sign-ins get different session ids, and logging one out leaves the other", async () => {
+  const c = configuredCtx();
+  const one = await signIn({}, c);
+  const two = await signIn({}, c);
+  const [a, b] = [one, two].map((r) => verifySignedValue(sessionOf(r.res).value, SESSION_SECRET, "session", NOW_MS).sid);
+  assert.notEqual(a, b);
+  await adminLogout(() => c.ctx, new Request(`${ORIGIN}/api/tessera/admin-logout`, { method: "POST", headers: { origin: ORIGIN, ...asSession(sessionOf(one.res).value) } }));
+  const alive = async (r) => (await (await adminSession(() => c.ctx, get("admin-session", asSession(sessionOf(r.res).value)))).json()).signedIn;
+  assert.equal(await alive(one), false);
+  assert.equal(await alive(two), true);
+});
+
+test("callback: if the session can't be stored in Redis the sign-in fails (no cookie)", async () => {
+  const c = configuredCtx();
+  c.ctx.store.set = async () => { throw new Error("redis down"); };
+  await assertRejected(await signIn({}, c), "token");
 });
 
 // ------------------------------------------------------------------ admin API with the cookie
@@ -364,8 +449,7 @@ async function adminSetup(over = {}) {
   ctx.mailer.sent.length = 0;
   return { ctx, google, rec };
 }
-const sessionCookieValue = (email = ADMIN, ctx = { now: () => NOW_MS }) =>
-  signValue({ email, exp: Math.floor(ctx.now() / 1000) + 3600, v: 1 }, SESSION_SECRET, "session");
+const sessionCookieValue = async (ctx, email = ADMIN) => (await sessionFor(ctx, email)).value;
 const adminCall = (ctx, body, headers, method = "POST") =>
   adminHandler(() => ctx, new Request(`${ORIGIN}/api/tessera/admin`, {
     method, headers: { "content-type": "application/json", ...headers }, ...(method === "GET" ? {} : { body: JSON.stringify(body) }),
@@ -373,7 +457,7 @@ const adminCall = (ctx, body, headers, method = "POST") =>
 
 test("admin API with the session cookie works with the right Origin: lookup, revoke, reissue; logs action + lid + via, never email or key", async () => {
   const { ctx, rec } = await adminSetup();
-  const headers = { ...asSession(sessionCookieValue()), origin: ORIGIN };
+  const headers = { ...asSession(await sessionCookieValue(ctx)), origin: ORIGIN };
   const look = await adminCall(ctx, { action: "lookup", target: rec.lid }, headers);
   assert.equal(look.status, 200);
   assert.equal((await look.json()).licenses[0].lid, rec.lid);
@@ -398,7 +482,7 @@ test("admin API with the cookie: wrong, missing or look-alike Origin → 403 and
   const { ctx, rec } = await adminSetup();
   const body = { action: "revoke", target: rec.lid };
   for (const origin of [undefined, "", "null", "https://evil.example.com", "https://conorgriffin.com", "http://www.conorgriffin.com", `${ORIGIN}.evil.example.com`, `${ORIGIN}/`]) {
-    const res = await adminCall(ctx, body, { ...asSession(sessionCookieValue()), ...(origin === undefined ? {} : { origin }) });
+    const res = await adminCall(ctx, body, { ...asSession(await sessionCookieValue(ctx)), ...(origin === undefined ? {} : { origin }) });
     assert.equal(res.status, 403, `origin ${origin}`);
     assert.equal((await res.json()).error, "bad_origin");
   }
@@ -408,22 +492,45 @@ test("admin API with the cookie: wrong, missing or look-alike Origin → 403 and
 test("admin API with the cookie: no, tampered, expired or de-listed cookie → 401; GET with a valid cookie → 405", async () => {
   const { ctx, rec } = await adminSetup();
   const body = { action: "lookup", target: rec.lid };
-  const good = sessionCookieValue();
+  const good = await sessionCookieValue(ctx);
   const [b, sig] = good.split(".");
   const cases = [
     {},
     asSession(`${b}.${sig.slice(0, -2)}AA`),
-    asSession(`${b64u({ email: ADMIN, exp: 9999999999, v: 1 })}.${sig}`),
-    asSession(signValue({ email: ADMIN, exp: Math.floor(NOW_MS / 1000) - 5, v: 1 }, SESSION_SECRET, "session")),
-    asSession(sessionCookieValue("gone@example.com")),
+    asSession(`${b64u({ email: ADMIN, sid: "A".repeat(43), exp: 9999999999, v: 2 })}.${sig}`),
+    asSession((await sessionFor(ctx, ADMIN, { exp: Math.floor(NOW_MS / 1000) - 5 })).value),
+    asSession(await sessionCookieValue(ctx, "gone@example.com")),
   ];
   for (const c of cases) assert.equal((await adminCall(ctx, body, { ...c, origin: ORIGIN })).status, 401);
   assert.equal((await adminCall(ctx, null, { ...asSession(good), origin: ORIGIN }, "GET")).status, 405);
 });
 
+test("admin API: after logout the copied cookie is useless (401), though its signature and expiry are fine", async () => {
+  const { ctx, rec } = await adminSetup();
+  const live = await sessionFor(ctx);
+  const headers = { ...asSession(live.value), origin: ORIGIN };
+  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, headers)).status, 200);
+  await adminLogout(() => ctx, new Request(`${ORIGIN}/api/tessera/admin-logout`, { method: "POST", headers }));
+  const res = await adminCall(ctx, { action: "lookup", target: rec.lid }, headers);
+  assert.equal(res.status, 401);
+  // ... and deleting only the Redis key (an admin killing a session by hand) works the same way.
+  const second = await sessionFor(ctx);
+  const h2 = { ...asSession(second.value), origin: ORIGIN };
+  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, h2)).status, 200);
+  ctx.store.strings.delete(`adminsess:${second.sid}`);
+  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, h2)).status, 401);
+});
+
+test("admin API: the old tessera_admin cookie name is ignored", async () => {
+  const { ctx, rec } = await adminSetup();
+  const value = await sessionCookieValue(ctx);
+  const res = await adminCall(ctx, { action: "lookup", target: rec.lid }, { cookie: `tessera_admin=${value}`, origin: ORIGIN });
+  assert.equal(res.status, 401);
+});
+
 test("admin API: removing the email from TESSERA_ADMIN_EMAILS ends the session at once", async () => {
   const { ctx, rec } = await adminSetup();
-  const headers = { ...asSession(sessionCookieValue()), origin: ORIGIN };
+  const headers = { ...asSession(await sessionCookieValue(ctx)), origin: ORIGIN };
   assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, headers)).status, 200);
   ctx.env.TESSERA_ADMIN_EMAILS = "someone-else@example.com";
   assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, headers)).status, 401);
@@ -436,19 +543,19 @@ test("admin API: the bearer path is unchanged (no Origin needed), and logs via: 
   assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { authorization: "Bearer wrong" })).status, 401);
   assert.equal(ctx.logs.find((l) => l.msg === "admin action").via, "bearer");
   // Both configured: the cookie still works too.
-  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { ...asSession(sessionCookieValue()), origin: ORIGIN })).status, 200);
+  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { ...asSession(await sessionCookieValue(ctx)), origin: ORIGIN })).status, 200);
 });
 
 test("admin API: a bearer secret cannot be used as a cookie, and the cookie does not need TESSERA_ADMIN_SECRET", async () => {
   const { ctx, rec } = await adminSetup(); // no TESSERA_ADMIN_SECRET at all
   assert.equal(ctx.env.TESSERA_ADMIN_SECRET, undefined);
   assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { authorization: `Bearer ${BEARER}` })).status, 401); // configured, so not 404
-  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { ...asSession(sessionCookieValue()), origin: ORIGIN })).status, 200);
+  assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, { ...asSession(await sessionCookieValue(ctx)), origin: ORIGIN })).status, 200);
 });
 
 test("admin API is 404 only when neither bearer nor Google admin is configured; a cookie alone does nothing without Google config", async () => {
   const { ctx, rec } = await adminSetup();
-  const headers = { ...asSession(sessionCookieValue()), origin: ORIGIN };
+  const headers = { ...asSession(await sessionCookieValue(ctx)), origin: ORIGIN };
   for (const k of ["GOOGLE_CLIENT_ID", "TESSERA_ADMIN_SESSION_SECRET"]) delete ctx.env[k];
   assert.equal((await adminCall(ctx, { action: "lookup", target: rec.lid }, headers)).status, 404);
   ctx.env.TESSERA_ADMIN_SECRET = BEARER; // bearer only: cookies are ignored (401), bearer works

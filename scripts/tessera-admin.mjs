@@ -39,6 +39,7 @@ if (!ACTIONS.includes(action) || !target) fail(USAGE, 2);
 
 const secret = process.env.TESSERA_ADMIN_SECRET;
 if (!secret) fail("TESSERA_ADMIN_SECRET is not set.", 2);
+if (secret.length < 32) fail("TESSERA_ADMIN_SECRET must be at least 32 characters (the server ignores a shorter one). Generate one with: openssl rand -hex 32", 2);
 if (values.reason && action !== "revoke") fail("--reason only applies to revoke.", 2);
 if (values.reason && !["leaked", "manual"].includes(values.reason)) fail("--reason must be leaked or manual.", 2);
 

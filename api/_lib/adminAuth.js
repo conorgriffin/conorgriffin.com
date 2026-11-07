@@ -11,7 +11,8 @@ export const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
 export const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
 export const LOGIN_COOKIE = "tessera_admin_login";
-export const SESSION_COOKIE = "tessera_admin";
+// `__Host-` makes browsers insist on Secure + Path=/ + no Domain, so a sibling subdomain can't plant or shadow it.
+export const SESSION_COOKIE = "__Host-tessera_admin";
 export const LOGIN_MAX_AGE_SECONDS = 600; // 10 minutes
 export const SESSION_MAX_AGE_SECONDS = 8 * 3600; // 8 hours
 const CLOCK_SKEW_SECONDS = 60;
@@ -19,6 +20,9 @@ const JWKS_TTL_MS = 3600 * 1000;
 const JWKS_MIN_REFETCH_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 const DEFAULT_BASE_URL = "https://www.conorgriffin.com";
+export const ADMIN_SECRET_MIN_LENGTH = 32;
+const sessionKey = (/** @type {string} */ sid) => `adminsess:${sid}`;
+const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
 
 // ---------------------------------------------------------------- configuration
 
@@ -42,6 +46,47 @@ export function googleAdminConfig(env) {
   if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) return null;
   const origin = url.origin;
   return { clientId, clientSecret, emails, sessionSecret, baseUrl: origin, origin, redirectUri: `${origin}/api/tessera/admin-callback` };
+}
+
+/** @type {WeakSet<object>} */
+const warnedShortSecret = new WeakSet();
+
+/**
+ * The bearer secret for POST /api/tessera/admin, or "" when unset or shorter than 32 characters (then the bearer path
+ * is off, as if unset; a short secret could be guessed online).
+ * @param {{ env: Record<string, string | undefined>, log?: { warn: (msg: string, f?: object) => void } }} ctx
+ */
+export function adminSecret(ctx) {
+  const secret = ctx.env.TESSERA_ADMIN_SECRET ?? "";
+  if (secret.length >= ADMIN_SECRET_MIN_LENGTH) return secret;
+  if (secret && !warnedShortSecret.has(ctx)) {
+    warnedShortSecret.add(ctx);
+    ctx.log?.warn("admin secret too short", { minimum: ADMIN_SECRET_MIN_LENGTH });
+  }
+  return "";
+}
+
+/**
+ * True when the request was addressed to the configured admin host (TESSERA_ADMIN_BASE_URL, default www), by URL
+ * and, when the header is there, by Host. Old *.vercel.app deployments keep their own copy of the settings; this makes
+ * them useless for admin. An unusable base URL falls back to the default host.
+ * @param {Request} request @param {Record<string, string | undefined>} env
+ */
+export function adminHostMatches(request, env) {
+  let expected;
+  try {
+    const u = new URL((env.TESSERA_ADMIN_BASE_URL ?? "").trim() || DEFAULT_BASE_URL);
+    expected = (u.protocol === "https:" || (u.protocol === "http:" && u.hostname === "localhost") ? u : new URL(DEFAULT_BASE_URL)).host;
+  } catch {
+    expected = new URL(DEFAULT_BASE_URL).host;
+  }
+  try {
+    if (new URL(request.url).host.toLowerCase() !== expected) return false;
+  } catch {
+    return false;
+  }
+  const header = request.headers.get("host");
+  return header === null || header.trim().toLowerCase() === expected;
 }
 
 // ---------------------------------------------------------------- cookies
@@ -114,27 +159,59 @@ export function loginCookie(v, secret, nowMs) {
   return serializeCookie(LOGIN_COOKIE, signValue({ ...v, exp }, secret, "login"), { ...LOGIN_COOKIE_OPTS, maxAge: LOGIN_MAX_AGE_SECONDS });
 }
 
-/** @param {string} email @param {string} secret @param {number} nowMs */
-export function sessionCookie(email, secret, nowMs) {
+/** @param {string} email @param {string} sid @param {string} secret @param {number} nowMs */
+export function sessionCookie(email, sid, secret, nowMs) {
   const exp = Math.floor(nowMs / 1000) + SESSION_MAX_AGE_SECONDS;
-  return serializeCookie(SESSION_COOKIE, signValue({ email, exp, v: 1 }, secret, "session"), { ...SESSION_COOKIE_OPTS, maxAge: SESSION_MAX_AGE_SECONDS });
+  return serializeCookie(SESSION_COOKIE, signValue({ email, sid, exp, v: 2 }, secret, "session"), { ...SESSION_COOKIE_OPTS, maxAge: SESSION_MAX_AGE_SECONDS });
 }
 
 /**
- * The signed-in admin's email for a request, or null. The email is re-checked against the allowlist every time,
- * so removing an address from TESSERA_ADMIN_EMAILS signs that person out at once.
- * @param {{ env: Record<string, string | undefined>, now: () => number }} ctx
- * @param {Request} request
- * @returns {string | null}
+ * Creates the server-side half of a session: a random id held in Redis for 8 hours. A cookie is only good while
+ * its id is still there, so logout (or deleting the key) ends it for real.
+ * @param {{ store: any }} ctx @param {string} email
  */
-export function sessionEmail(ctx, request) {
+export async function startSession(ctx, email) {
+  const sid = b64url(crypto.randomBytes(32));
+  await ctx.store.set(sessionKey(sid), email.trim().toLowerCase(), { ex: SESSION_MAX_AGE_SECONDS });
+  return { sid };
+}
+
+/** The signed session payload from the request's cookie (signature, expiry and shape only), or null. @returns {{ email: string, sid: string } | null} */
+function sessionPayload(/** @type {{ now: () => number }} */ ctx, /** @type {Request} */ request, /** @type {string} */ secret) {
+  const value = parseCookies(request.headers.get("cookie"))[SESSION_COOKIE];
+  const s = verifySignedValue(value, secret, "session", ctx.now());
+  if (!s || s.v !== 2 || typeof s.email !== "string" || typeof s.sid !== "string" || !SESSION_ID.test(s.sid)) return null;
+  return { email: s.email, sid: s.sid };
+}
+
+/** Logout: removes the session from Redis if the request carries a validly signed session cookie. */
+export async function endSession(/** @type {{ env: Record<string, string | undefined>, now: () => number, store: any }} */ ctx, /** @type {Request} */ request) {
+  const cfg = googleAdminConfig(ctx.env);
+  const s = cfg && sessionPayload(ctx, request, cfg.sessionSecret);
+  if (s) await ctx.store.del(sessionKey(s.sid));
+}
+
+/**
+ * The signed-in admin's email for a request, or null. Needs a valid signed cookie, the session id still live in Redis
+ * (so logout works), and the email still in the allowlist (so removing an address signs that person out at once).
+ * Fails closed if Redis can't be reached.
+ * @param {{ env: Record<string, string | undefined>, now: () => number, store: any, log?: any }} ctx
+ * @param {Request} request
+ * @returns {Promise<string | null>}
+ */
+export async function sessionEmail(ctx, request) {
   const cfg = googleAdminConfig(ctx.env);
   if (!cfg) return null;
-  const value = parseCookies(request.headers.get("cookie"))[SESSION_COOKIE];
-  const s = verifySignedValue(value, cfg.sessionSecret, "session", ctx.now());
-  if (!s || s.v !== 1 || typeof s.email !== "string") return null;
+  const s = sessionPayload(ctx, request, cfg.sessionSecret);
+  if (!s) return null;
   const email = s.email.trim().toLowerCase();
-  return cfg.emails.has(email) ? email : null;
+  if (!cfg.emails.has(email)) return null;
+  try {
+    return (await ctx.store.get(sessionKey(s.sid))) === email ? email : null;
+  } catch (e) {
+    ctx.log?.warn("admin session lookup failed", { error: (e && /** @type {any} */ (e).name) || "Error" });
+    return null;
+  }
 }
 
 /** CSRF guard for cookie-authenticated writes: the browser must say the request came from our own origin. */

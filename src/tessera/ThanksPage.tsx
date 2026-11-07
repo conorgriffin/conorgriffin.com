@@ -5,6 +5,7 @@ type State =
   | { kind: "loading" }
   | { kind: "ready"; license: string; email: string; activationUrl: string }
   | { kind: "pending" }
+  | { kind: "revisit" }
   | { kind: "error" };
 
 type CopyState = "idle" | "copied" | "failed";
@@ -17,14 +18,27 @@ interface LicenseResponse {
 
 const button = "inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition";
 
+// The Checkout Session id in the address works as a link to the key, so it is read once and then removed from the
+// address bar (history, bookmarks and screenshots never hold it). It lives only in this variable: a reload starts
+// from nothing and sends the buyer to "find my license". Read at module level so React's double effects in
+// development don't see the stripped address the second time.
+let takenSessionId: string | null | undefined;
+function takeSessionId(): string | null {
+  if (takenSessionId === undefined) {
+    takenSessionId = new URLSearchParams(window.location.search).get("session_id");
+    if (window.location.search || window.location.hash) window.history.replaceState(null, "", window.location.pathname);
+  }
+  return takenSessionId;
+}
+
 export function ThanksPage() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [copy, setCopy] = useState<CopyState>("idle");
 
   useEffect(() => {
-    const sessionId = new URLSearchParams(window.location.search).get("session_id");
+    const sessionId = takeSessionId();
     if (!sessionId) {
-      setState({ kind: "error" });
+      setState({ kind: "revisit" });
       return;
     }
     const controller = new AbortController();
@@ -61,7 +75,7 @@ export function ThanksPage() {
 
         <section aria-labelledby="license-title" aria-live="polite" className="mt-10 rounded-2xl border border-tessera-panel-line bg-tessera-panel p-6 text-tessera-panel-ink md:p-8">
           <h2 id="license-title" className="text-2xl font-medium md:text-3xl">
-            {state.kind === "error" ? "Your license is on its way" : state.kind === "pending" ? "Your payment is still processing" : "Your license key"}
+            {state.kind === "error" ? "Your license is on its way" : state.kind === "pending" ? "Your payment is still processing" : state.kind === "revisit" ? "Your license was emailed to you" : "Your license key"}
           </h2>
 
           {state.kind === "loading" && <p className="mt-3 text-lg leading-relaxed text-tessera-panel-muted">Getting your license…</p>}
@@ -69,6 +83,12 @@ export function ThanksPage() {
           {state.kind === "pending" && (
             <p className="mt-3 text-lg leading-relaxed text-tessera-panel-muted">
               Some payment methods take a little while to clear. I'll email your license as soon as the payment goes through. You can also check back on the <a href={paths.license} className="font-medium text-tessera-accent underline underline-offset-4">find my license</a> page.
+            </p>
+          )}
+
+          {state.kind === "revisit" && (
+            <p className="mt-3 text-lg leading-relaxed text-tessera-panel-muted">
+              For your security this page shows your key only once, right after you pay, and not again after a reload. Your license is in the email I sent you. If it hasn't arrived, use the <a href={paths.license} className="font-medium text-tessera-accent underline underline-offset-4">find my license</a> page, or email <a href={`mailto:${supportEmail}`} className="font-medium text-tessera-accent underline underline-offset-4">{supportEmail}</a>.
             </p>
           )}
 
@@ -90,7 +110,7 @@ export function ThanksPage() {
                 <a href="/tessera/download" className={`${button} border border-tessera-panel-line hover:bg-tessera-panel-deep`}>Download Tessera <span aria-hidden="true">↓</span></a>
               </div>
               {copy === "failed" && <p className="mt-3 text-sm text-tessera-warn">Couldn't copy automatically. Select the key above and copy it.</p>}
-              <p className="mt-6 text-tessera-panel-muted">I've also emailed a copy to the same address, so you'll always have it.</p>
+              <p className="mt-6 text-tessera-panel-muted">I've also emailed a copy to the same address, so you'll always have it. For your security, this page won't show the key again after you reload: copy it now, or use <a href={paths.license} className="font-medium text-tessera-accent underline underline-offset-4">find my license</a> later.</p>
             </>
           )}
         </section>
