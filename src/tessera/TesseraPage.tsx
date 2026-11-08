@@ -76,6 +76,7 @@ const proHighlights = [
 
 const faqs: [string, string][] = [
   ["Is it really free?", "Yes. Decoding, verifying, decrypting, the security checks and building and signing tokens are all free, with no time limit. Tessera Pro adds saved keys, issuer key fetching, JWE encryption, the menu bar popover and history."],
+  ["Why not just use jwt.io?", "jwt.io is great for a quick look. Tessera is for when you'd rather not paste a production token into a website, need to decrypt a JWE, or want your keys and history kept on your Mac. It's also one ⌘V away, with plain-English security checks and a live expiry countdown."],
   ["Is Tessera Pro a subscription?", "No. It's a one-time purchase, shown in your local currency at checkout."],
   ["Is the download safe to open?", "Yes. It's signed with my Apple Developer ID and notarized by Apple, so it opens like any other Mac app. Updates arrive inside the app."],
   ["What's the difference between this and the App Store version?", "It's the same app. The direct version updates itself and Tessera Pro is a license key sent by email. The App Store version uses Apple's in-app purchase. The two purchases are separate."],
