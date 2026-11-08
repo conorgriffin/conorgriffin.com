@@ -137,10 +137,18 @@ export function TesseraPage() {
                   Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span>
                 </a>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
+              <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">Pro adds</span> saved keys behind Touch ID, one-click issuer keys, JWE encryption, templates, and a menu bar peek at tokens you copy. <a href="#pro" className="text-foreground underline underline-offset-4 hover:text-primary">See what's in Pro</a>.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
             </>
           ) : (
             <>
+              {import.meta.env.VITE_VERCEL_ENV === "preview" && (
+                <p className="mt-5 rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
+                  Preview build: Download and Buy Pro are hidden because VITE_TESSERA_SALES_OPEN is only set in Production. Visitors never see this note.
+                </p>
+              )}
               <p className="mt-5 text-sm text-muted-foreground">Free on the Mac App Store, with an optional one-time Tessera Pro upgrade. No subscription.</p>
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 <span aria-disabled="true" className="inline-flex items-center gap-2 rounded-full bg-tessera-navy px-5 py-2.5 text-sm font-medium text-tessera-ink">
@@ -230,7 +238,7 @@ export function TesseraPage() {
         </div>
       </section>
 
-      <section aria-labelledby="pro-title" className="reveal pb-24">
+      <section id="pro" aria-labelledby="pro-title" className="reveal scroll-mt-24 pb-24">
         <div className="tessera-rule" />
         <p className="eyebrow mt-16">Tessera Pro</p>
         <h2 id="pro-title" className="mt-3 text-4xl font-medium md:text-5xl">More, if you want it.</h2>
