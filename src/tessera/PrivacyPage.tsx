@@ -33,9 +33,6 @@ export function PrivacyPage() {
           <p>License emails are sent with <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className={link}>Resend<span className="sr-only"> (opens in a new tab)</span></a>.</p>
           <p>About once a week, the app downloads a public list of deactivated licenses from conorgriffin.com. The request carries no license, email address or other identifier, only the app version. Tessera also uses Sparkle to check conorgriffin.com for new versions, without sending a system profile. This website is hosted on Vercel, which, like any web host, may process request details such as your IP address. The website (not the app) uses Vercel Web Analytics to count page views and see which sites send visitors here. It uses no cookies and doesn't identify you or follow you across sites.</p>
         </Part>
-        <Part title="Children">
-          <p>Tessera doesn't collect data from anyone, including children.</p>
-        </Part>
         <Part title="Changes">
           <p>If this policy changes, the updated version will be posted on this page with a new date.</p>
         </Part>
