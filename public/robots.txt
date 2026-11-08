@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /tessera/admin
 
-Sitemap: https://conorgriffin.com/sitemap.xml
+Sitemap: https://www.conorgriffin.com/sitemap.xml
