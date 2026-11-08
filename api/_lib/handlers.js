@@ -138,7 +138,7 @@ export async function reconcileHandler(/** @type {() => any} */ getCtx, /** @typ
 
 const LID = /^[0-9a-f]{32}$/;
 const ADMIN_BODY_MAX = 8192;
-const ADMIN_ACTIONS = new Set(["lookup", "revoke", "unrevoke", "reissue"]);
+const ADMIN_ACTIONS = new Set(["lookup", "revoke", "unrevoke", "reissue", "stats"]);
 const ADMIN_REVOKE_REASONS = new Set(["leaked", "manual"]);
 
 /**
@@ -244,6 +244,14 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
   }
   const action = body?.action;
   if (typeof action !== "string" || !ADMIN_ACTIONS.has(action)) return json({ error: "bad_action" }, 400);
+  if (action === "stats") {
+    try {
+      return json({ days: await clickStats(ctx, STATS_DAYS) });
+    } catch (e) {
+      ctx.log.error("admin stats failed", { error: errName(e) });
+      return json({ error: "failed" }, 500);
+    }
+  }
   const target = parseAdminTarget(body?.target);
   if (!target) return json({ error: "bad_target" }, 400);
   if (!("lid" in target) && action !== "lookup") return json({ error: "email_only_for_lookup" }, 400);
@@ -361,6 +369,45 @@ export async function adminLogout(/** @type {() => any} */ getCtx, /** @type {Re
     return json({ error: "logout_failed" }, 500);
   }
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "Set-Cookie": clearSessionCookie() } });
+}
+
+// ---------------------------------------------------------------- buy and download clicks
+
+const GO_TARGETS = /** @type {Record<string, string>} */ ({ buy: "TESSERA_PAYMENT_LINK_URL", download: "TESSERA_DOWNLOAD_URL" });
+const CLICK_TTL_SECONDS = 400 * 24 * 60 * 60;
+const STATS_DAYS = 30;
+// Link previews and crawlers follow links too; they shouldn't count as people.
+const BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|curl|wget|python-requests|headless/i;
+
+const utcDay = (/** @type {number} */ ms) => new Date(ms).toISOString().slice(0, 10);
+const clickKey = (/** @type {string} */ to, /** @type {string} */ day) => `clicks:${to}:${day}`;
+
+/**
+ * GET /api/tessera/go?to=buy|download: counts the click per UTC day in Redis (no IP, cookie or anything
+ * about the visitor is stored), then 302s to the URL in the environment. Counting is best effort: if Redis
+ * is down or not configured, the visitor is still sent on.
+ */
+export async function goHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+  const to = new URL(request.url).searchParams.get("to") ?? "";
+  const name = Object.hasOwn(GO_TARGETS, to) ? GO_TARGETS[to] : undefined;
+  if (!name || !salesOpen(process.env)) return new Response("Not found", { status: 404 });
+  if (request.method === "GET" && !BOT_UA.test(request.headers.get("user-agent") ?? "")) {
+    try {
+      const ctx = getCtx();
+      await ctx.store.incrWithExpiry(clickKey(to, utcDay(ctx.now())), CLICK_TTL_SECONDS);
+    } catch (e) {
+      console.warn(JSON.stringify({ level: "warn", msg: "click count failed", to, error: errName(e) }));
+    }
+  }
+  return redirectTo(() => process.env, name);
+}
+
+/** Buy and download clicks for the last `days` UTC days, newest first. */
+export async function clickStats(/** @type {any} */ ctx, /** @type {number} */ days) {
+  const today = Date.parse(utcDay(ctx.now()));
+  const dates = Array.from({ length: days }, (_, i) => utcDay(today - i * 86400000));
+  const values = await ctx.store.mget(dates.flatMap((d) => [clickKey("download", d), clickKey("buy", d)]));
+  return dates.map((date, i) => ({ date, download: Number(values[2 * i] ?? 0), buy: Number(values[2 * i + 1] ?? 0) }));
 }
 
 /** GET /api/tessera/go?to=buy|download: 302 to a URL held in an environment variable. */

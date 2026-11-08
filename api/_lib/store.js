@@ -10,6 +10,7 @@
 //   sadd(key, member): Promise<number>   (1 if added)
 //   srem(key, member): Promise<number>   (1 if removed)
 //   smembers(key): Promise<string[]>
+//   mget(keys): Promise<(string | null)[]>
 
 /**
  * `namespace` is prepended to every key (e.g. "tessera:"), so one database can serve several products.
@@ -69,6 +70,11 @@ export function createRedisStore({ url, token, namespace = "", fetch: fetchImpl 
     async smembers(key) {
       return /** @type {string[]} */ (await run(["SMEMBERS", k(key)])) ?? [];
     },
+    async mget(/** @type {string[]} */ keys) {
+      if (keys.length === 0) return [];
+      const values = /** @type {unknown[]} */ (await run(["MGET", ...keys.map(k)])) ?? [];
+      return keys.map((_, i) => (values[i] == null ? null : String(values[i])));
+    },
   };
 }
 
@@ -117,6 +123,9 @@ export function createMemoryStore() {
     },
     async smembers(key) {
       return [...(sets.get(key) ?? [])];
+    },
+    async mget(/** @type {string[]} */ keys) {
+      return keys.map((key) => strings.get(key) ?? null);
     },
   };
 }

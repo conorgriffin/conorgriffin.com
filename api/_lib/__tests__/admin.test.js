@@ -464,3 +464,16 @@ test("admin: logs never contain emails or licence keys", async () => {
   assert.ok(logged.length > 2);
   assert.ok(!/example\.com|TSR1-/.test(logged));
 });
+
+test("admin: stats returns 30 days of buy/download clicks, newest first, and needs auth", async () => {
+  const { ctx } = await setup();
+  const day = new Date(ctx.now()).toISOString().slice(0, 10);
+  ctx.store.strings.set(`clicks:download:${day}`, "5");
+  ctx.store.strings.set(`clicks:buy:${day}`, "2");
+  const res = await call(ctx, { action: "stats" });
+  assert.equal(res.status, 200);
+  const { days } = await res.json();
+  assert.equal(days.length, 30);
+  assert.deepEqual(days[0], { date: day, download: 5, buy: 2 });
+  assert.equal((await call(ctx, { action: "stats" }, { auth: "Bearer wrong" })).status, 401);
+});
