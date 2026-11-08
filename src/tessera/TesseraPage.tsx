@@ -79,7 +79,7 @@ const faqs: [string, string][] = [
   ["Is Tessera Pro a subscription?", "No. It's a one-time purchase, shown in your local currency at checkout."],
   ["Is the download safe to open?", "Yes. It's signed with my Apple Developer ID and notarized by Apple, so it opens like any other Mac app. Updates arrive inside the app."],
   ["What's the difference between this and the App Store version?", "It's the same app. The direct version updates itself and Tessera Pro is a license key sent by email. The App Store version uses Apple's in-app purchase. The two purchases are separate."],
-  ["Does Tessera send my tokens anywhere?", "No. Everything happens on your Mac. The only network request is when you choose to fetch keys from an issuer, and that goes straight to the issuer."],
+  ["Does Tessera send my tokens anywhere?", "No. Tokens, keys and history never leave your Mac. Tessera only goes online to fetch an issuer's public keys when you ask, which goes straight to the issuer and sends nothing from your token. The direct-download version also checks this site for updates and for refunded licenses, without sending anything about you or your tokens."],
   ["What do I need?", "A Mac running macOS 15 or later."],
 ];
 

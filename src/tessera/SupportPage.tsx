@@ -2,7 +2,7 @@ import { PageIntro, TesseraLayout, email, paths } from "./Layout";
 import { TileBullet } from "./TesseraIcon";
 
 const faqs: [string, string][] = [
-  ["Does Tessera send my tokens anywhere?", "No. Everything is processed on your Mac. The only network request is when you choose Fetch keys from issuer, which contacts that issuer directly."],
+  ["Does Tessera send my tokens anywhere?", "No. Tokens, keys and history never leave your Mac. Tessera only goes online when you choose Fetch keys from issuer, which downloads that issuer's public keys directly and sends nothing from your token. The direct-download version also checks conorgriffin.com for updates and refunded licenses. See the privacy policy for details."],
   ["How do I restore Tessera Pro?", "In the App Store version, open Tessera › Tessera Pro… and choose Restore Purchase, or go to Settings › Purchases."],
   ["I bought Tessera Pro on your website. How do I get my license again?", "Go to conorgriffin.com/tessera/license and enter the email you bought with. I'll send your license again. Then open Tessera, go to Settings › Purchases › Enter License… and paste it."],
   ["Is Tessera Pro a subscription?", "No, it's a one-time purchase."],
