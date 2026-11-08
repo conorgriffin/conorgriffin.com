@@ -144,6 +144,11 @@ export function TesseraPage() {
             </>
           ) : (
             <>
+              {import.meta.env.VITE_VERCEL_ENV === "preview" && (
+                <p className="mt-5 rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
+                  Preview build: Download and Buy Pro are hidden because VITE_TESSERA_SALES_OPEN is only set in Production. Visitors never see this note.
+                </p>
+              )}
               <p className="mt-5 text-sm text-muted-foreground">Free on the Mac App Store, with an optional one-time Tessera Pro upgrade. No subscription.</p>
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 <span aria-disabled="true" className="inline-flex items-center gap-2 rounded-full bg-tessera-navy px-5 py-2.5 text-sm font-medium text-tessera-ink">
