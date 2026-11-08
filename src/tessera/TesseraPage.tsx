@@ -66,12 +66,21 @@ const pro = [
   "Full history of up to 500 tokens, encrypted on your Mac, with Prod, Staging and Dev tags",
 ];
 
+// Short list for the hero card; the full list is in the Pro section below.
+const proHighlights = [
+  "Saved keys behind Touch ID",
+  "One-click keys from the issuer",
+  "JWE encryption and templates",
+  "Menu bar peek at copied tokens",
+];
+
 const faqs: [string, string][] = [
   ["Is it really free?", "Yes. Decoding, verifying, decrypting, the security checks and building and signing tokens are all free, with no time limit. Tessera Pro adds saved keys, issuer key fetching, JWE encryption, the menu bar popover and history."],
+  ["Why not just use jwt.io?", "jwt.io is great for a quick look. Tessera is for when you'd rather not paste a production token into a website, need to decrypt a JWE, or want your keys and history kept on your Mac. It's also one ⌘V away, with plain-English security checks and a live expiry countdown."],
   ["Is Tessera Pro a subscription?", "No. It's a one-time purchase, shown in your local currency at checkout."],
   ["Is the download safe to open?", "Yes. It's signed with my Apple Developer ID and notarized by Apple, so it opens like any other Mac app. Updates arrive inside the app."],
   ["What's the difference between this and the App Store version?", "It's the same app. The direct version updates itself and Tessera Pro is a license key sent by email. The App Store version uses Apple's in-app purchase. The two purchases are separate."],
-  ["Does Tessera send my tokens anywhere?", "No. Everything happens on your Mac. The only network request is when you choose to fetch keys from an issuer, and that goes straight to the issuer."],
+  ["Does Tessera send my tokens anywhere?", "No. Tokens, keys and history never leave your Mac. Tessera only goes online to fetch an issuer's public keys when you ask, which goes straight to the issuer and sends nothing from your token. The direct-download version also checks this site for updates and for refunded licenses, without sending anything about you or your tokens."],
   ["What do I need?", "A Mac running macOS 15 or later."],
 ];
 
@@ -137,9 +146,21 @@ export function TesseraPage() {
                   Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span>
                 </a>
               </div>
-              <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">Pro adds</span> saved keys behind Touch ID, one-click issuer keys, JWE encryption, templates, and a menu bar peek at tokens you copy. <a href="#pro" className="text-foreground underline underline-offset-4 hover:text-primary">See what's in Pro</a>.
-              </p>
+              <div className="mt-6 max-w-xl rounded-2xl border bg-card p-5">
+                <p className="flex flex-wrap items-center gap-2 font-medium">
+                  <span className="rounded-full bg-tessera-navy px-2 py-0.5 text-xs font-medium text-tessera-ink">Pro</span>
+                  One-time purchase, no subscription
+                </p>
+                <ul className="mt-3 grid gap-x-6 gap-y-2 text-sm text-muted-foreground sm:grid-cols-2">
+                  {proHighlights.map((h) => (
+                    <li key={h} className="flex gap-2">
+                      <span aria-hidden="true" className="text-primary">✓</span>
+                      <span className="text-foreground">{h}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a href="#pro" className="mt-4 inline-block text-sm text-foreground underline underline-offset-4 hover:text-primary">See everything in Pro</a>
+              </div>
               <p className="mt-2 text-sm text-muted-foreground">{latest.version && <>Version {latest.version}{latest.updated && <>, updated {latest.updated}</>}. </>}Requires macOS 15 or later. Coming soon to the Mac App Store too. <a href="#get" className="text-foreground underline underline-offset-4 hover:text-primary">Compare the two</a>.</p>
             </>
           ) : (

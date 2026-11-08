@@ -44,7 +44,7 @@ const guides: Guide[] = [
       <>Tessera reads the token's <code>iss</code>, finds the issuer's key set through OpenID Connect discovery, and verifies with the key that matches <code>kid</code>.</>,
       <>Keys are cached for up to 24 hours. Choose <UI>Refresh</UI> to fetch them again, for example after the issuer rotates keys.</>,
     ],
-    tip: <>This is the only time Tessera goes online. The request goes straight from your Mac to the issuer over HTTPS.</>,
+    tip: <>Tessera downloads the issuer's public keys straight from the issuer over HTTPS. Nothing from your token is sent.</>,
   },
   {
     id: "jwe",
