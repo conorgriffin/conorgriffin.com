@@ -155,7 +155,7 @@ Fixes from the adversarial security review of the license admin:
 
 ## Redis keys
 
-`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `reissue:<old lid>` (the replacement's id; claimed atomically so a reissue happens once), `ignored:<cs_id>` (4-day expiry, sessions for other products), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry), `rl:adminfail:<hash of IP>` (failed admin attempts, 1-hour expiry), `adminsess:<sid>` (admin page session, 8-hour expiry). Licence records also carry `purchasedAt` (the Checkout Session's created time), and `paymentRevokedAt` / `paymentRevokeReason` once the payment was refunded or disputed.
+`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `reissue:<old lid>` (the replacement's id; claimed atomically so a reissue happens once), `ignored:<cs_id>` (4-day expiry, sessions for other products), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry), `rl:adminfail:<hash of IP>` (failed admin attempts, 1-hour expiry), `adminsess:<sid>` (admin page session, 8-hour expiry), `clicks:download:<YYYY-MM-DD>` and `clicks:buy:<YYYY-MM-DD>` (site clicks per UTC day, counted by `/api/tessera/go` for non-bot GETs, 400-day expiry; shown on the admin page). Licence records also carry `purchasedAt` (the Checkout Session's created time), and `paymentRevokedAt` / `paymentRevokeReason` once the payment was refunded or disputed.
 
 To look at a license by hand, open the Upstash data browser and `GET lic:<lid>`.
 

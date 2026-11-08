@@ -237,3 +237,50 @@ test("sales stay closed unless VITE_TESSERA_SALES_OPEN is 1", async () => {
   assert.equal(salesOpen({ VITE_TESSERA_SALES_OPEN: "0" }), false);
   assert.equal(salesOpen({ VITE_TESSERA_SALES_OPEN: "1" }), true);
 });
+
+// ------------------------------------------------------------------ buy/download click counter
+
+test("go: counts a person's click per UTC day, then redirects; bots and HEAD aren't counted", async () => {
+  const { goHandler, clickStats } = await import("../handlers.js");
+  const saved = { ...process.env };
+  Object.assign(process.env, { VITE_TESSERA_SALES_OPEN: "1", TESSERA_DOWNLOAD_URL: "https://example.com/Tessera.dmg", TESSERA_PAYMENT_LINK_URL: "https://buy.stripe.com/x" });
+  try {
+    const ctx = makeCtx();
+    const req = (to, ua = "Mozilla/5.0 (Macintosh)", method = "GET") =>
+      goHandler(() => ctx, new Request(`https://www.conorgriffin.com/api/tessera/go?to=${to}`, { method, headers: { "user-agent": ua } }));
+    const res = await req("download");
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get("location"), "https://example.com/Tessera.dmg");
+    await req("download");
+    await req("buy");
+    await req("download", "Slackbot-LinkExpanding 1.0");
+    await req("download", undefined, "HEAD");
+    const day = new Date(NOW_MS).toISOString().slice(0, 10);
+    assert.equal(ctx.store.strings.get(`clicks:download:${day}`), "2");
+    assert.equal(ctx.store.strings.get(`clicks:buy:${day}`), "1");
+    assert.ok(ctx.store.ttls.get(`clicks:download:${day}`) > 0, "counters expire");
+    const days = await clickStats(ctx, 3);
+    assert.deepEqual(days[0], { date: day, download: 2, buy: 1 });
+    assert.equal(days.length, 3);
+    assert.deepEqual(days[1].download, 0);
+    assert.equal((await req("constructor")).status, 404);
+  } finally {
+    process.env = saved;
+  }
+});
+
+test("go: still redirects when the counter store fails", async () => {
+  const { goHandler } = await import("../handlers.js");
+  const saved = { ...process.env };
+  Object.assign(process.env, { VITE_TESSERA_SALES_OPEN: "1", TESSERA_DOWNLOAD_URL: "https://example.com/Tessera.dmg" });
+  try {
+    const res = await goHandler(() => { throw new Error("KV_REST_API_URL and KV_REST_API_TOKEN are required"); },
+      new Request("https://www.conorgriffin.com/api/tessera/go?to=download"));
+    assert.equal(res.status, 302);
+    delete process.env.VITE_TESSERA_SALES_OPEN;
+    const closed = await goHandler(() => makeCtx(), new Request("https://www.conorgriffin.com/api/tessera/go?to=download"));
+    assert.equal(closed.status, 404);
+  } finally {
+    process.env = saved;
+  }
+});

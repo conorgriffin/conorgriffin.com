@@ -188,11 +188,82 @@ export function AdminPage() {
               <button type="button" onClick={signOut} className="underline underline-offset-4 hover:text-foreground">Sign out</button>
             </p>
             {signOutError && <p role="alert" className="mt-2 text-sm text-tessera-warn">{signOutError}</p>}
+            <Clicks onSignedOut={() => setSession({ kind: "out" })} />
             <Licenses onSignedOut={() => setSession({ kind: "out" })} />
           </>
         )}
       </div>
     </TesseraLayout>
+  );
+}
+
+interface DayClicks { date: string; download: number; buy: number }
+
+/** Download and Buy Pro clicks on the site (people only; brew installs and in-app updates don't go through it). */
+function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
+  const [days, setDays] = useState<DayClicks[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const signedOut = useRef(onSignedOut);
+  signedOut.current = onSignedOut;
+
+  useEffect(() => {
+    let live = true;
+    adminRequest({ action: "stats" })
+      .then(({ status, data }) => {
+        if (!live) return;
+        if (status === 401) signedOut.current();
+        else if (status === 200 && Array.isArray(data?.days)) setDays(data.days as DayClicks[]);
+        else setFailed(true);
+      })
+      .catch(() => live && setFailed(true));
+    return () => { live = false; };
+  }, []);
+
+  const sum = (n: number, key: "download" | "buy") => (days ?? []).slice(0, n).reduce((t, d) => t + d[key], 0);
+  const recent = (days ?? []).slice(0, 14);
+  const max = Math.max(1, ...recent.map((d) => d.download));
+  const label = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
+
+  return (
+    <section aria-labelledby="clicks-title" className={`mt-6 ${panel}`}>
+      <h2 id="clicks-title" className="text-lg font-medium">Site clicks</h2>
+      <p className="mt-1 text-sm text-tessera-panel-muted">Download and Buy Pro clicks on this site, by UTC day. Brew installs and in-app updates aren't included.</p>
+      {failed && <p role="alert" className="mt-4 text-tessera-warn">Couldn't load the counts. Reload to try again.</p>}
+      {!failed && !days && <p className="mt-4 text-tessera-panel-muted" aria-live="polite">Loading…</p>}
+      {days && (
+        <>
+          <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {([["Today", 1], ["Last 7 days", 7], ["Last 30 days", 30]] as const).map(([title, n]) => (
+              <div key={title} className="rounded-xl bg-tessera-panel-deep p-4">
+                <dt className="text-sm text-tessera-panel-muted">{title}</dt>
+                <dd className="mt-1 text-2xl font-medium tabular-nums">{sum(n, "download")} <span className="text-sm font-normal text-tessera-panel-muted">downloads</span></dd>
+                <dd className="text-sm tabular-nums text-tessera-panel-muted">{sum(n, "buy")} Buy Pro</dd>
+              </div>
+            ))}
+          </dl>
+          <table className="mt-6 w-full text-sm">
+            <caption className="sr-only">Clicks per day, last 14 days</caption>
+            <thead className="text-left text-tessera-panel-muted">
+              <tr><th scope="col" className="pb-2 font-normal">Day</th><th scope="col" className="pb-2 font-normal">Downloads</th><th scope="col" className="pb-2 text-right font-normal">Buy Pro</th></tr>
+            </thead>
+            <tbody>
+              {recent.map((d) => (
+                <tr key={d.date}>
+                  <th scope="row" className="w-20 py-1 pr-3 text-left font-normal text-tessera-panel-muted">{label(d.date)}</th>
+                  <td className="py-1">
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden="true" className="h-2 rounded-full bg-tessera-accent" style={{ width: `${(d.download / max) * 70}%`, minWidth: d.download ? "4px" : 0 }} />
+                      <span className="tabular-nums">{d.download}</span>
+                    </span>
+                  </td>
+                  <td className="py-1 text-right tabular-nums">{d.buy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </section>
   );
 }
 
