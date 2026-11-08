@@ -246,7 +246,9 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
   if (typeof action !== "string" || !ADMIN_ACTIONS.has(action)) return json({ error: "bad_action" }, 400);
   if (action === "stats") {
     try {
-      return json({ days: await clickStats(ctx, STATS_DAYS) });
+      // The product id isn't secret; the admin page uses it to link to the product in the Stripe Dashboard.
+      const productId = /^prod_[A-Za-z0-9]+$/.test(ctx.env.TESSERA_STRIPE_PRODUCT_ID ?? "") ? ctx.env.TESSERA_STRIPE_PRODUCT_ID : null;
+      return json({ days: await clickStats(ctx, STATS_DAYS), stripeProductId: productId });
     } catch (e) {
       ctx.log.error("admin stats failed", { error: errName(e) });
       return json({ error: "failed" }, 500);

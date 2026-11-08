@@ -202,6 +202,7 @@ interface DayClicks { date: string; download: number; buy: number }
 /** Download and Buy Pro clicks on the site (people only; brew installs and in-app updates don't go through it). */
 function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
   const [days, setDays] = useState<DayClicks[] | null>(null);
+  const [productId, setProductId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const signedOut = useRef(onSignedOut);
   signedOut.current = onSignedOut;
@@ -212,7 +213,10 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
       .then(({ status, data }) => {
         if (!live) return;
         if (status === 401) signedOut.current();
-        else if (status === 200 && Array.isArray(data?.days)) setDays(data.days as DayClicks[]);
+        else if (status === 200 && Array.isArray(data?.days)) {
+          setDays(data.days as DayClicks[]);
+          if (typeof data.stripeProductId === "string" && /^prod_[A-Za-z0-9]+$/.test(data.stripeProductId)) setProductId(data.stripeProductId);
+        }
         else setFailed(true);
       })
       .catch(() => live && setFailed(true));
@@ -226,7 +230,13 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <section aria-labelledby="clicks-title" className={`mt-6 ${panel}`}>
-      <h2 id="clicks-title" className="text-lg font-medium">Site clicks</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id="clicks-title" className="text-lg font-medium">Site clicks</h2>
+        <a href={productId ? `https://dashboard.stripe.com/products/${productId}` : "https://dashboard.stripe.com/products"}
+          target="_blank" rel="noopener noreferrer" className="text-sm underline underline-offset-4 hover:text-tessera-accent">
+          Tessera Pro in Stripe<span className="sr-only"> (opens in a new tab)</span> <span aria-hidden="true">↗</span>
+        </a>
+      </div>
       <p className="mt-1 text-sm text-tessera-panel-muted">Download and Buy Pro clicks on this site, by UTC day. Brew installs and in-app updates aren't included.</p>
       {failed && <p role="alert" className="mt-4 text-tessera-warn">Couldn't load the counts. Reload to try again.</p>}
       {!failed && !days && <p className="mt-4 text-tessera-panel-muted" aria-live="polite">Loading…</p>}

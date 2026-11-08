@@ -472,8 +472,9 @@ test("admin: stats returns 30 days of buy/download clicks, newest first, and nee
   ctx.store.strings.set(`clicks:buy:${day}`, "2");
   const res = await call(ctx, { action: "stats" });
   assert.equal(res.status, 200);
-  const { days } = await res.json();
+  const { days, stripeProductId } = await res.json();
   assert.equal(days.length, 30);
+  assert.equal(stripeProductId, "prod_tessera");
   assert.deepEqual(days[0], { date: day, download: 5, buy: 2 });
   assert.equal((await call(ctx, { action: "stats" }, { auth: "Bearer wrong" })).status, 401);
 });
