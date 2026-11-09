@@ -452,7 +452,7 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
         <dd className="break-all">{license.email}</dd>
         <dt className="text-tessera-panel-muted">Issued</dt>
         <dd>{formatDate(license.issuedAt)}</dd>
-        <dt className="text-tessera-panel-muted">Email</dt>
+        <dt className="text-tessera-panel-muted">License email</dt>
         <dd>{license.emailedAt ? `Sent ${formatDateTime(license.emailedAt)}` : revoked ? "Not sent" : "Not sent yet, retried nightly"}</dd>
         {license.reissuedFrom && (
           <>
