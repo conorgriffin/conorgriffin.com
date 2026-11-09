@@ -16,6 +16,7 @@ interface License {
   paymentRevokedAt: number | null;
   replacedBy: string | null;
   reissuedFrom: string | null;
+  emailedAt: number | null;
 }
 
 type Session =
@@ -68,6 +69,9 @@ const button = "inline-flex items-center justify-center gap-2 rounded-full px-5 
 const primaryButton = `${button} bg-foreground text-background hover:opacity-90`;
 const quietButton = `${button} border border-tessera-panel-line hover:bg-tessera-panel-deep`;
 const panel = "rounded-2xl border border-tessera-panel-line bg-tessera-panel p-6 text-tessera-panel-ink md:p-8";
+
+const formatDateTime = (seconds: number) =>
+  new Date(seconds * 1000).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const shortId = (lid: string) => lid.slice(0, 8);
 const formatDate = (seconds: number) =>
@@ -448,6 +452,8 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
         <dd className="break-all">{license.email}</dd>
         <dt className="text-tessera-panel-muted">Issued</dt>
         <dd>{formatDate(license.issuedAt)}</dd>
+        <dt className="text-tessera-panel-muted">License email</dt>
+        <dd>{license.emailedAt ? `Sent ${formatDateTime(license.emailedAt)}` : revoked ? "Not sent" : "Not sent yet, retried nightly"}</dd>
         {license.reissuedFrom && (
           <>
             <dt className="text-tessera-panel-muted">Replaces</dt>

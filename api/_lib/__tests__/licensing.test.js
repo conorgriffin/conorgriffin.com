@@ -4,6 +4,7 @@ import { verifyLicense, verifyRevocationList } from "../crypto.js";
 import {
   buildRevocationList, getLicense, handleEvent, issueLicense, reconcile, resendLicenses, retryUnsentEmails,
 } from "../licensing.js";
+import { activationLink, createMailer, licenseEmail, reissuedEmail, resendEmail } from "../email.js";
 import { NOW_MS, event, makeCtx, makeSession, vectors } from "./helpers.js";
 
 const licenseKeys = { T1: vectors.keys.license.publicKeyBase64 };
@@ -42,7 +43,10 @@ test("issueLicense signs a verifiable licence, stores it, indexes it and emails 
   assert.equal(ctx.mailer.sent[0].to, "Buyer@Example.com");
   assert.equal(ctx.mailer.sent[0].subject, "Your Tessera Pro license");
   assert.ok(ctx.mailer.sent[0].text.includes(r.record.license));
-  assert.ok(ctx.mailer.sent[0].text.includes("tessera-direct://activate?key="));
+  const link = `https://www.conorgriffin.com/tessera/activate#key=${encodeURIComponent(r.record.license)}`;
+  assert.ok(ctx.mailer.sent[0].text.includes(link));
+  assert.ok(ctx.mailer.sent[0].html.includes(link));
+  assert.ok(!ctx.mailer.sent[0].text.includes("tessera-direct://") && !ctx.mailer.sent[0].html.includes("tessera-direct://"));
   assert.ok(ctx.mailer.sent[0].text.includes("https://conorgriffin.com/tessera/download"));
   assert.ok(ctx.mailer.sent[0].text.includes("https://conorgriffin.com/tessera/license"));
   assert.ok(ctx.mailer.sent[0].text.includes("support@example.com"));
@@ -393,4 +397,46 @@ test("reconcile counts errors per item and carries on", async () => {
   const r = await reconcile(ctx);
   assert.equal(r.issued, 1);
   assert.equal(r.errors, 1);
+});
+
+test("emails link to the https activation page, never the custom scheme", () => {
+  const rec = { license: "TSR1-abc.def", email: "a@example.com" };
+  const link = activationLink(rec.license);
+  assert.equal(link, "https://www.conorgriffin.com/tessera/activate#key=TSR1-abc.def");
+  for (const m of [licenseEmail(rec, "s@example.com"), reissuedEmail(rec, "s@example.com"), resendEmail([rec], "s@example.com")]) {
+    assert.ok(m.text.includes(link) && m.html.includes(link));
+    assert.ok(!m.text.includes("tessera-direct://") && !m.html.includes("tessera-direct://"));
+  }
+});
+
+test("mailer surfaces Resend's error name and status, and nothing else from the body", async () => {
+  const mk = (status, body) => createMailer({ apiKey: "k", from: "f@example.com", fetch: async () => ({ ok: false, status, json: async () => body }) });
+  const send = (m) => m.send({ to: "x@example.com", subject: "s", text: "t" });
+  await assert.rejects(send(mk(403, { name: "validation_error", message: "domain x@example.com not verified" })), (e) => {
+    assert.equal(e.message, "resend failed (403): validation_error");
+    assert.equal(e.status, 403);
+    assert.equal(e.mailer, true);
+    return true;
+  });
+  await assert.rejects(send(mk(500, { name: "not a short name!" })), /^Error: resend failed \(500\)$/);
+  const bad = createMailer({ apiKey: "k", from: "f@example.com", fetch: async () => ({ ok: false, status: 502, json: async () => { throw new Error("html"); } }) });
+  await assert.rejects(send(bad), { message: "resend failed (502)", status: 502 });
+});
+
+test("a failed licence email logs the mailer detail but no address, key or body", async () => {
+  const { ctx, session } = ctxWithSession();
+  ctx.mailer.send = async () => { throw Object.assign(new Error("resend failed (403): validation_error"), { status: 403, mailer: true }); };
+  await issueLicense(ctx, session.id);
+  const entry = ctx.logs.find((l) => l.msg === "licence email failed");
+  assert.equal(entry.error, "Error");
+  assert.equal(entry.detail, "resend failed (403): validation_error");
+  assert.ok(!JSON.stringify(ctx.logs).includes("example.com") && !JSON.stringify(ctx.logs).includes("TSR1-"));
+});
+
+test("non-mailer errors log no detail", async () => {
+  const { ctx, session } = ctxWithSession();
+  ctx.mailer.fail = true; // plain Error("resend down")
+  await issueLicense(ctx, session.id);
+  const entry = ctx.logs.find((l) => l.msg === "licence email failed");
+  assert.deepEqual(Object.keys(entry).sort(), ["error", "level", "msg"]);
 });

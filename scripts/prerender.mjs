@@ -11,6 +11,7 @@ const pages = {
   privacy: "dist/tessera/privacy/index.html",
   support: "dist/tessera/support/index.html",
   thanks: "dist/tessera/thanks/index.html",
+  activate: "dist/tessera/activate/index.html",
   license: "dist/tessera/license/index.html",
   terms: "dist/tessera/terms/index.html",
   admin: "dist/tessera/admin/index.html",

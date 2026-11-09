@@ -3,13 +3,14 @@ import { SiteHeader, useReveal } from "@/components/site";
 import { links } from "@/content/site";
 import { TesseraIcon } from "./TesseraIcon";
 
-export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "license" | "terms" | "admin" | "guide";
+export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "activate" | "license" | "terms" | "admin" | "guide";
 
 export const paths: Record<TesseraPageId, string> = {
   home: "/tessera",
   privacy: "/tessera/privacy",
   support: "/tessera/support",
   thanks: "/tessera/thanks",
+  activate: "/tessera/activate",
   license: "/tessera/license",
   terms: "/tessera/terms",
   admin: "/tessera/admin",

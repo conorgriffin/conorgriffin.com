@@ -166,6 +166,8 @@ async function setStripeMetadata(/** @type {any} */ ctx, /** @type {string | nul
 }
 
 const errName = (/** @type {any} */ e) => (e && e.name) || "Error";
+/** Log fields for a mailer failure. The message is only included for our own mailer errors, which never hold addresses, keys or bodies. */
+const mailFail = (/** @type {any} */ e) => (e && e.mailer === true ? { error: errName(e), detail: String(e.message).slice(0, 200) } : { error: errName(e) });
 
 /** Sends the licence email once. Failure is logged and left for the cron. Returns whether it was sent. */
 export async function sendLicenseEmail(/** @type {any} */ ctx, /** @type {string} */ lid) {
@@ -175,7 +177,7 @@ export async function sendLicenseEmail(/** @type {any} */ ctx, /** @type {string
     const message = rec.reissuedFrom ? reissuedEmail(rec, ctx.env.SUPPORT_EMAIL) : licenseEmail(rec, ctx.env.SUPPORT_EMAIL);
     await ctx.mailer.send({ to: rec.email, ...message, idempotencyKey: `tessera-license-${lid}` });
   } catch (e) {
-    ctx.log.warn("licence email failed", { error: errName(e) });
+    ctx.log.warn("licence email failed", mailFail(e));
     return false;
   }
   await patchLicense(ctx, lid, (r) => { r.emailedAt = nowSeconds(ctx); });
@@ -251,7 +253,7 @@ async function revokeOne(ctx, lid, reason, primary) {
     try {
       await ctx.mailer.send({ to: rec.email, ...revokedEmail(), idempotencyKey: `tessera-revoked-${lid}` });
     } catch (e) {
-      ctx.log.warn("revocation email failed", { error: errName(e) });
+      ctx.log.warn("revocation email failed", mailFail(e));
     }
   }
   return changed ? "revoked" : "already";
@@ -557,7 +559,7 @@ export async function resendLicenses(/** @type {any} */ ctx, /** @type {string} 
   try {
     await ctx.mailer.send({ to: records[0].email, ...resendEmail(records, ctx.env.SUPPORT_EMAIL) });
   } catch (e) {
-    ctx.log.warn("resend email failed", { error: errName(e) });
+    ctx.log.warn("resend email failed", mailFail(e));
     return "none";
   }
   return "sent";
