@@ -17,6 +17,9 @@ interface License {
   replacedBy: string | null;
   reissuedFrom: string | null;
   emailedAt: number | null;
+  /** Given away by the owner rather than bought. */
+  free: boolean;
+  freeNote: string | null;
 }
 
 type Session =
@@ -44,6 +47,19 @@ interface Reissued {
   license: string;
   email: string;
 }
+
+interface FreeIssued {
+  lid: string;
+  emailed: boolean;
+  license: string;
+  email: string;
+}
+
+const FREE_ERRORS: Record<string, string> = {
+  bad_email: "That doesn't look like an email address.",
+  bad_note: "The note is too long. Keep it to 200 characters.",
+  too_many_free: "That's 20 free licenses in the last day, which is the limit. Try again tomorrow.",
+};
 
 const LOGIN_ERRORS: Record<string, string> = {
   denied: "Google sign-in was cancelled. You can try again whenever you like.",
@@ -383,6 +399,8 @@ function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
         {lookup.kind === "error" && <p role="alert" className="mt-3 text-tessera-warn">{lookup.message}</p>}
       </div>
 
+      <FreeLicense onSignedOut={onSignedOut} onShow={showLicense} />
+
       {reissued && <ReissuedKey info={reissued} onShow={() => showLicense(reissued.newLid)} onDismiss={() => setReissued(null)} />}
 
       {lookup.kind === "done" && licenses.length === 0 && (
@@ -421,6 +439,7 @@ function StatusBadge({ license }: { license: License }) {
   return (
     <span className="flex flex-wrap items-center gap-2">
       {status}
+      {license.free && <span className={`${base} border-tessera-panel-line bg-tessera-panel-deep text-tessera-panel-ink`}>Free</span>}
       {payment}
     </span>
   );
@@ -452,6 +471,12 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
         <dd className="break-all">{license.email}</dd>
         <dt className="text-tessera-panel-muted">Issued</dt>
         <dd>{formatDate(license.issuedAt)}</dd>
+        {license.free && (
+          <>
+            <dt className="text-tessera-panel-muted">Given free</dt>
+            <dd className="break-words">{license.freeNote ?? "No note"}</dd>
+          </>
+        )}
         <dt className="text-tessera-panel-muted">License email</dt>
         <dd>{license.emailedAt ? `Sent ${formatDateTime(license.emailedAt)}` : revoked ? "Not sent" : "Not sent yet, retried nightly"}</dd>
         {license.reissuedFrom && (
@@ -488,6 +513,138 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
         </p>
       )}
     </li>
+  );
+}
+
+/** "Give a free license" panel: a confirm dialog, then the key (in case the email fails). */
+function FreeLicense({ onSignedOut, onShow }: { onSignedOut: () => void; onShow: (lid: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [issued, setIssued] = useState<FreeIssued | null>(null);
+  const { copied, failed, copy } = useCopy();
+
+  function openConfirm(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setIssued(null);
+    setConfirming(true);
+  }
+
+  /** Issues the license. Returns an error message to show in the dialog, or null on success. */
+  async function issue(): Promise<string | null> {
+    const body: Record<string, string> = { action: "issue_free", email: email.trim() };
+    if (note.trim()) body.note = note.trim();
+    const result = await adminRequest(body).catch(() => null);
+    if (!result) return "Couldn't reach the server. Nothing was issued that I know of; look the email up before trying again.";
+    const { status, data } = result;
+    if (status === 401) {
+      onSignedOut();
+      return "Your sign-in has expired. Sign in again.";
+    }
+    if (status !== 200 || data?.result !== "issued") {
+      return FREE_ERRORS[String(data?.error)] ?? "That didn't work. Look the email up to see whether a license was issued.";
+    }
+    setIssued({ lid: data.lid, emailed: Boolean(data.emailed), license: data.license, email: email.trim() });
+    setEmail("");
+    setNote("");
+    return null;
+  }
+
+  return (
+    <>
+      <form onSubmit={openConfirm} className={`mt-6 ${panel}`}>
+        <h2 className="text-lg font-medium">Give a free license</h2>
+        <p className="mt-1 text-sm text-tessera-panel-muted">Signs a Tessera Pro key, emails it to them and records it as free.</p>
+        <div className="mt-3 grid gap-3">
+          <div>
+            <label htmlFor="free-email" className="text-sm font-medium">Email</label>
+            <input id="free-email" name="free-email" type="email" required autoComplete="off" autoCapitalize="off" spellCheck={false}
+              value={email} onChange={(e) => setEmail(e.target.value)} placeholder="friend@example.com"
+              className="mt-1 w-full min-w-0 rounded-xl border border-tessera-panel-line bg-tessera-panel-deep px-4 py-3 text-lg text-tessera-panel-ink placeholder:text-tessera-panel-muted focus:outline-2 focus:outline-offset-2 focus:outline-tessera-accent" />
+          </div>
+          <div>
+            <label htmlFor="free-note" className="text-sm font-medium">Note (only you see this)</label>
+            <input id="free-note" name="free-note" type="text" maxLength={200} autoComplete="off"
+              value={note} onChange={(e) => setNote(e.target.value)} placeholder="Who it's for, e.g. Sam from work"
+              className="mt-1 w-full min-w-0 rounded-xl border border-tessera-panel-line bg-tessera-panel-deep px-4 py-3 text-lg text-tessera-panel-ink placeholder:text-tessera-panel-muted focus:outline-2 focus:outline-offset-2 focus:outline-tessera-accent" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <button type="submit" className={primaryButton}>Issue free license</button>
+        </div>
+      </form>
+
+      {issued && (
+        <section aria-labelledby="free-issued-title" aria-live="polite" className={`mt-6 ${panel}`}>
+          <h2 id="free-issued-title" className="text-2xl font-medium">Free license for {issued.email}</h2>
+          <p className="mt-2 text-tessera-panel-muted">
+            {issued.emailed
+              ? `Free license issued and emailed to ${issued.email}.`
+              : "Free license issued, but the email didn't send. Copy the key below and send it yourself."}
+          </p>
+          <p className="mt-4 select-all break-all rounded-xl bg-tessera-panel-deep p-4 font-mono text-sm leading-relaxed">{issued.license}</p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={() => copy(issued.license, "free-key")} className={primaryButton}>{copied === "free-key" ? "Copied" : "Copy key"}</button>
+            <button type="button" onClick={() => onShow(issued.lid)} className={quietButton}>Show license</button>
+            <button type="button" onClick={() => setIssued(null)} className={quietButton}>Hide key</button>
+          </div>
+          {failed && <p className="mt-3 text-sm text-tessera-warn">Couldn't copy automatically. Select the key above and copy it.</p>}
+        </section>
+      )}
+
+      {confirming && (
+        <FreeConfirmDialog email={email.trim()} onCancel={() => setConfirming(false)}
+          onConfirm={async () => {
+            const error = await issue();
+            if (!error) setConfirming(false);
+            return error;
+          }} />
+      )}
+    </>
+  );
+}
+
+function FreeConfirmDialog({ email, onCancel, onConfirm }: {
+  email: string;
+  onCancel: () => void;
+  onConfirm: () => Promise<string | null>;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    const message = await onConfirm();
+    setBusy(false);
+    if (message) setError(message);
+  }
+
+  return (
+    <dialog ref={ref} aria-labelledby="free-confirm-title" onCancel={(e) => { e.preventDefault(); if (!busy) onCancel(); }}
+      onClick={(e) => { if (e.target === ref.current && !busy) onCancel(); }}
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-tessera-panel-line bg-tessera-panel p-0 text-tessera-panel-ink backdrop:bg-black/50">
+      <div className="p-6">
+        <h2 id="free-confirm-title" className="text-2xl font-medium">Give a free license?</h2>
+        <div className="mt-3 space-y-3 leading-relaxed text-tessera-panel-muted">
+          <p>This signs a new Tessera Pro key for <strong>{email}</strong> and <strong>emails it to them</strong>. It is recorded as free.</p>
+          <p>Each press of the button issues another license, so check the address first.</p>
+        </div>
+        {error && <p role="alert" className="mt-4 text-tessera-warn">{error}</p>}
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" onClick={onCancel} disabled={busy} className={quietButton}>Cancel</button>
+          <button type="button" onClick={confirm} disabled={busy} className={primaryButton}>{busy ? "Working…" : "Issue and email"}</button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 

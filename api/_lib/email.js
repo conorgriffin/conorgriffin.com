@@ -165,6 +165,46 @@ Conor
   return { subject, text, html };
 }
 
+/** Sent when the owner gives a free licence. Never mentions the admin's private note. @param {{ license: string, email: string }} rec @param {string} supportEmail */
+export function freeLicenseEmail(rec, supportEmail) {
+  const subject = "Your free Tessera Pro license";
+  const text = `Here's a Tessera Pro license for you, on me. Enjoy!
+
+Your license key:
+
+${rec.license}
+
+Licensed to ${rec.email}
+
+To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
+${activationLink(rec.license)}
+
+If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
+
+Download Tessera: ${DOWNLOAD_URL}
+Lost this email? Find your license: ${FIND_LICENSE_URL}
+
+Questions? Reply to this email or write to ${supportEmail}.
+
+Conor
+`;
+  const html = layout({
+    preheader: "A free Tessera Pro license, on me.",
+    bodyHtml: [
+      p("Here's a Tessera Pro license for you, on me. Enjoy!"),
+      p("Your license key:"),
+      keyBlock(rec.license, rec.email),
+      button(activationLink(rec.license), "Open in Tessera &rarr;"),
+      p(`To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or ${link(activationLink(rec.license), "open it in Tessera")} on your Mac.`),
+      p("If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces."),
+      p(`${link(DOWNLOAD_URL, "Download Tessera")} &middot; ${link(FIND_LICENSE_URL, "Lost this email? Find your license")}`),
+      questions(supportEmail),
+      signoff,
+    ].join("\n"),
+  });
+  return { subject, text, html };
+}
+
 /** Sent with a replacement key. Deliberately says nothing about why. @param {{ license: string, email: string }} rec @param {string} supportEmail */
 export function reissuedEmail(rec, supportEmail) {
   const subject = "Your new Tessera Pro license";

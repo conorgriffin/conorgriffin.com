@@ -1,10 +1,10 @@
 // Licence issuing, revocation and the event rules. Everything takes a context
 // `ctx = { env, store, stripe, mailer, now(), log }` so tests can fake each part.
 //
-// Redis keys: lic:<lid>, session:<cs_id>, pi:<pi_id>, email:<sha256(email)>, revoked (set),
+// Redis keys: lic:<lid>, session:<cs_id> (Stripe purchases only; free licences have none), pi:<pi_id>, email:<sha256(email)>, revoked (set),
 // revocations:seq, evt:<event id>, unsent (set of lids whose email failed), ignored:<cs_id>.
 import { emailHash, randomLicenseId, signLicense, signRevocationList } from "./crypto.js";
-import { activationUrl, licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "./email.js";
+import { activationUrl, freeLicenseEmail, licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "./email.js";
 
 const DAY = 86400;
 export const SESSION_MAX_AGE_SECONDS = 7 * DAY;
@@ -16,7 +16,9 @@ const licKey = (/** @type {string} */ lid) => `lic:${lid}`;
  * `replacedBy` is set on a record that was reissued; `reissuedFrom` on the replacement. `purchasedAt` is the Checkout
  * Session's created time (copied into replacements). `paymentRevokedAt` / `paymentRevokeReason` record that the
  * payment itself was refunded or disputed, separately from `revokeReason` (which is only the first reason).
- * @typedef {{ lid: string, email: string, license: string, sessionId: string, paymentIntent: string | null, issuedAt: number, purchasedAt?: number, revokedAt: number | null, revokeReason: string | null, paymentRevokedAt?: number | null, paymentRevokeReason?: "refund" | "dispute" | null, emailedAt?: number | null, indexedAt?: number | null, replacedBy?: string, reissuedFrom?: string }} LicenseRecord
+ * A free licence (given by the admin) has `free: true`, a private `freeNote`, `freeBy` ("cli" or the admin's Google email),
+ * `sessionId` "free:<lid>" and no payment intent; it has no `session:` key. A reissue carries the three `free*` fields over.
+ * @typedef {{ lid: string, email: string, license: string, sessionId: string, paymentIntent: string | null, issuedAt: number, purchasedAt?: number, revokedAt: number | null, revokeReason: string | null, paymentRevokedAt?: number | null, paymentRevokeReason?: "refund" | "dispute" | null, emailedAt?: number | null, indexedAt?: number | null, replacedBy?: string, reissuedFrom?: string, free?: boolean, freeNote?: string | null, freeBy?: string }} LicenseRecord
  */
 
 /** Revocations that happen on our side: no email to the customer. */
@@ -71,20 +73,21 @@ const idOf = (/** @type {any} */ v) => (typeof v === "string" ? v : v?.id ?? nul
 /**
  * Generates a fresh licence id, signs the licence and builds the (unsaved) record. Shared by first issue and reissue.
  * @param {any} ctx
- * @param {{ email: string, sessionId: string, paymentIntent: string | null, reissuedFrom?: string, purchasedAt?: number }} p
+ * @param {{ email: string, sessionId: string | ((lid: string) => string), paymentIntent: string | null, reissuedFrom?: string, purchasedAt?: number, free?: Pick<LicenseRecord, "free" | "freeNote" | "freeBy"> }} p
  * @returns {LicenseRecord}
  */
-function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom, purchasedAt }) {
+function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom, purchasedAt, free }) {
   const { env } = ctx;
   const lid = randomLicenseId();
   const issuedAt = nowSeconds(ctx);
   const license = signLicense({ privateKey: env.TESSERA_LICENSE_PRIVATE_KEY, kid: env.TESSERA_LICENSE_KID || "L1", lid, email, iat: issuedAt });
   /** @type {LicenseRecord} */
   const rec = {
-    lid, email, license, sessionId, paymentIntent,
+    lid, email, license, sessionId: typeof sessionId === "function" ? sessionId(lid) : sessionId, paymentIntent,
     issuedAt, purchasedAt: purchasedAt ?? issuedAt, revokedAt: null, revokeReason: null, emailedAt: null, indexedAt: null,
   };
   if (reissuedFrom) rec.reissuedFrom = reissuedFrom;
+  if (free?.free) Object.assign(rec, { free: true, freeNote: free.freeNote ?? null, freeBy: free.freeBy });
   return rec;
 }
 
@@ -174,7 +177,8 @@ export async function sendLicenseEmail(/** @type {any} */ ctx, /** @type {string
   const rec = await getLicense(ctx, lid);
   if (!rec || rec.emailedAt) return false;
   try {
-    const message = rec.reissuedFrom ? reissuedEmail(rec, ctx.env.SUPPORT_EMAIL) : licenseEmail(rec, ctx.env.SUPPORT_EMAIL);
+    const make = rec.reissuedFrom ? reissuedEmail : rec.free ? freeLicenseEmail : licenseEmail;
+    const message = make(rec, ctx.env.SUPPORT_EMAIL);
     await ctx.mailer.send({ to: rec.email, ...message, idempotencyKey: `tessera-license-${lid}` });
   } catch (e) {
     ctx.log.warn("licence email failed", mailFail(e));
@@ -397,7 +401,7 @@ export async function reissueLicense(ctx, oldLid) {
   if (claimed) {
     rec = await getLicense(ctx, claimed);
   } else {
-    const minted = mintLicense(ctx, { email: old.email, sessionId: old.sessionId, paymentIntent: old.paymentIntent, reissuedFrom: oldLid, purchasedAt: old.purchasedAt ?? old.issuedAt });
+    const minted = mintLicense(ctx, { email: old.email, sessionId: old.sessionId, paymentIntent: old.paymentIntent, reissuedFrom: oldLid, purchasedAt: old.purchasedAt ?? old.issuedAt, free: old });
     await putLicense(ctx, minted);
     if (await store.set(`reissue:${oldLid}`, minted.lid, { nx: true })) {
       rec = minted;
@@ -414,7 +418,7 @@ export async function reissueLicense(ctx, oldLid) {
   if (rec.revokedAt) return { result: "refused", oldLid, reason: "replacement_revoked" };
 
   // Move every pointer to the replacement first, so a refund or dispute arriving now revokes the new key.
-  if (old.sessionId) await store.set(`session:${old.sessionId}`, rec.lid);
+  if (old.sessionId && !old.free) await store.set(`session:${old.sessionId}`, rec.lid);
   if (rec.paymentIntent) await store.set(`pi:${rec.paymentIntent}`, rec.lid);
   if (old.replacedBy !== rec.lid) await patchLicense(ctx, oldLid, (r) => { r.replacedBy = rec.lid; });
   await revokeLicense(ctx, oldLid, "reissued"); // no-op if it was already revoked as leaked/manual
@@ -428,6 +432,25 @@ export async function reissueLicense(ctx, oldLid) {
   if (!rec.indexedAt) await finalize(ctx, rec); // email set, Stripe metadata, the new-key email
   else await sendLicenseEmail(ctx, rec.lid); // no-op when already sent
   return { result: created ? "reissued" : "already", oldLid, newLid: rec.lid, record: (await getLicense(ctx, rec.lid)) ?? rec };
+}
+
+const NOTE_MAX = 200;
+
+/**
+ * Admin: gives a free licence. Same key and record as a purchase, marked `free`, with no payment behind it. Emails the
+ * recipient (finalize). The note is for the admin only: it is never emailed or logged.
+ * @param {any} ctx
+ * @param {{ email: unknown, note?: unknown, by: string }} p `by` is "cli" or the admin's Google email
+ * @returns {Promise<{ ok: true, record: LicenseRecord } | { ok: false, reason: "invalid_email" }>}
+ */
+export async function issueFreeLicense(ctx, { email: rawEmail, note: rawNote, by }) {
+  const email = String(rawEmail ?? "").trim();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: "invalid_email" };
+  const note = String(rawNote ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").trim().slice(0, NOTE_MAX).trim();
+  const rec = mintLicense(ctx, { email, sessionId: (lid) => `free:${lid}`, paymentIntent: null, free: { free: true, freeNote: note || null, freeBy: String(by) } });
+  await putLicense(ctx, rec);
+  await finalize(ctx, rec);
+  return { ok: true, record: (await getLicense(ctx, rec.lid)) ?? rec };
 }
 
 /**
