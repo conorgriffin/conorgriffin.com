@@ -231,13 +231,39 @@ Conor
   return { subject, text, html };
 }
 
-export function revokedEmail() {
+export const BUY_URL = `${SITE}/tessera/buy`;
+
+/**
+ * Sent once when a refund or dispute deactivates a licence. Neutral wording: the app quietly drops to the free version.
+ * @param {{ lid: string, email: string }} rec @param {string} supportEmail
+ */
+export function revokedEmail(rec, supportEmail) {
   const subject = "Your Tessera Pro license has been deactivated";
-  const text =
-    "Your Tessera Pro license has been deactivated because the payment was refunded or disputed. Reply to this email if that's a mistake.\n";
+  const text = `Your Tessera Pro license is no longer active. This happens when a payment is refunded or disputed.
+
+Licensed to: ${rec.email}
+License ID: ${rec.lid}
+
+Tessera keeps working as the free version, and everything you've saved stays where it is.
+
+If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can buy Tessera Pro again at any time: ${BUY_URL}
+
+Questions? Reply to this email or write to ${supportEmail}.
+
+Conor
+`;
+  const meta = `<p class="muted" style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.6;color:#6b6c80">Licensed to ${esc(rec.email)}<br>License ID ${esc(rec.lid)}</p>`;
   const html = layout({
-    preheader: "Your Tessera Pro license has been deactivated.",
-    bodyHtml: p("Your Tessera Pro license has been deactivated because the payment was refunded or disputed. Reply to this email if that's a mistake.").replace("margin:0 0 16px", "margin:0"),
+    preheader: "Your Tessera Pro license is no longer active.",
+    bodyHtml: [
+      p("Your Tessera Pro license is no longer active. This happens when a payment is refunded or disputed."),
+      meta,
+      p("Tessera keeps working as the free version, and everything you've saved stays where it is."),
+      p("If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can also buy Tessera Pro again at any time."),
+      button(BUY_URL, "Buy Tessera Pro &rarr;"),
+      questions(supportEmail),
+      signoff,
+    ].join("\n"),
   });
   return { subject, text, html };
 }
