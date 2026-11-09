@@ -4,7 +4,7 @@ import { verifyLicense, verifyRevocationList } from "../crypto.js";
 import {
   buildRevocationList, getLicense, handleEvent, issueLicense, reconcile, resendLicenses, retryUnsentEmails,
 } from "../licensing.js";
-import { activationLink, createMailer, licenseEmail, reissuedEmail, resendEmail } from "../email.js";
+import { ICON_URL, activationLink, createMailer, licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "../email.js";
 import { NOW_MS, event, makeCtx, makeSession, vectors } from "./helpers.js";
 
 const licenseKeys = { T1: vectors.keys.license.publicKeyBase64 };
@@ -407,6 +407,20 @@ test("emails link to the https activation page, never the custom scheme", () => 
     assert.ok(m.text.includes(link) && m.html.includes(link));
     assert.ok(!m.text.includes("tessera-direct://") && !m.html.includes("tessera-direct://"));
   }
+});
+
+test("every email html body is branded: icon, activation link where relevant, escaped, no custom scheme", () => {
+  const rec = { license: "TSR1-abc.def", email: "a<b>@example.com" };
+  const link = activationLink(rec.license);
+  const withKey = [licenseEmail(rec, "s@example.com"), reissuedEmail(rec, "s@example.com"), resendEmail([rec], "s@example.com")];
+  for (const m of [...withKey, revokedEmail()]) {
+    assert.ok(m.html.includes(ICON_URL));
+    assert.ok(!m.html.includes("tessera-direct://"));
+    assert.ok(m.html.includes("color-scheme") && m.html.includes("prefers-color-scheme: dark"));
+    assert.ok(!m.html.includes("—"));
+  }
+  for (const m of withKey) assert.ok(m.html.includes(link) && m.html.includes("Open in Tessera"));
+  assert.ok(licenseEmail(rec, "s@example.com").html.includes("Licensed to a&lt;b&gt;@example.com"));
 });
 
 test("mailer surfaces Resend's error name and status, and nothing else from the body", async () => {
