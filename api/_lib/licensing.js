@@ -251,7 +251,7 @@ async function revokeOne(ctx, lid, reason, primary) {
   // The customer hears about a refund or dispute once, however many chain members or earlier admin reasons there are.
   if (primary && payment && !before) {
     try {
-      await ctx.mailer.send({ to: rec.email, ...revokedEmail(), idempotencyKey: `tessera-revoked-${lid}` });
+      await ctx.mailer.send({ to: rec.email, ...revokedEmail(rec, ctx.env.SUPPORT_EMAIL), idempotencyKey: `tessera-revoked-${lid}` });
     } catch (e) {
       ctx.log.warn("revocation email failed", mailFail(e));
     }

@@ -182,7 +182,9 @@ test("a full refund revokes: list, seq, record, factual email, Stripe metadata",
   assert.ok(stored.revokedAt);
   assert.equal(ctx.mailer.sent.length, 1);
   assert.equal(ctx.mailer.sent[0].to, "Buyer@Example.com");
-  assert.equal(ctx.mailer.sent[0].text, "Your Tessera Pro license has been deactivated because the payment was refunded or disputed. Reply to this email if that's a mistake.\n");
+  assert.match(ctx.mailer.sent[0].text, /^Your Tessera Pro license is no longer active\. This happens when a payment is refunded or disputed\./);
+  assert.ok(ctx.mailer.sent[0].text.includes(`License ID: ${rec.lid}`), "names the licence so support can find it");
+  assert.ok(!ctx.mailer.sent[0].text.includes("TSR1-"), "never repeats the revoked key");
   assert.equal(ctx.stripe.state.metadata[0].metadata.license_revoke_reason, "refund");
 });
 
@@ -413,7 +415,7 @@ test("every email html body is branded: icon, activation link where relevant, es
   const rec = { license: "TSR1-abc.def", email: "a<b>@example.com" };
   const link = activationLink(rec.license);
   const withKey = [licenseEmail(rec, "s@example.com"), reissuedEmail(rec, "s@example.com"), resendEmail([rec], "s@example.com")];
-  for (const m of [...withKey, revokedEmail()]) {
+  for (const m of [...withKey, revokedEmail({ lid: "a".repeat(32), email: "buyer@example.com" }, "support@conorgriffin.com")]) {
     assert.ok(m.html.includes(ICON_URL));
     assert.ok(!m.html.includes("tessera-direct://"));
     assert.ok(m.html.includes("color-scheme") && m.html.includes("prefers-color-scheme: dark"));

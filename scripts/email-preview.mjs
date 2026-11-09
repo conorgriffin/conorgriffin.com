@@ -12,7 +12,7 @@ const emails = {
   license: licenseEmail(rec, support),
   reissued: reissuedEmail(rec, support),
   resend: resendEmail([rec, rec2], support),
-  revoked: revokedEmail(),
+  revoked: revokedEmail({ lid: "3f9c2a7be41d4c0a9e6b8d1f2a7c5e90", email: rec.email }, "support@conorgriffin.com"),
 };
 for (const [name, m] of Object.entries(emails)) {
   writeFileSync(new URL(`${name}.html`, out), m.html);
