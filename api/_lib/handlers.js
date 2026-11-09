@@ -8,7 +8,7 @@ import {
   startSession, verifyIdToken, verifySignedValue,
 } from "./adminAuth.js";
 import {
-  SESSION_MAX_AGE_SECONDS, buildRevocationList, findLicenses, handleEvent, issueLicense, paymentRevocation, reconcile,
+  SESSION_MAX_AGE_SECONDS, buildRevocationList, findLicenses, handleEvent, issueFreeLicense, issueLicense, paymentRevocation, reconcile,
   reissueLicense, resendLicenses, revokeLicense, unrevokeLicense,
 } from "./licensing.js";
 
@@ -138,7 +138,10 @@ export async function reconcileHandler(/** @type {() => any} */ getCtx, /** @typ
 
 const LID = /^[0-9a-f]{32}$/;
 const ADMIN_BODY_MAX = 8192;
-const ADMIN_ACTIONS = new Set(["lookup", "revoke", "unrevoke", "reissue", "stats"]);
+const ADMIN_ACTIONS = new Set(["lookup", "revoke", "unrevoke", "reissue", "stats", "issue_free"]);
+const FREE_NOTE_MAX = 200;
+const FREE_LIMIT = 20; // free licences per rolling day, overall: a safety net should the admin session ever be abused
+const FREE_WINDOW_SECONDS = 86400;
 const ADMIN_REVOKE_REASONS = new Set(["leaked", "manual"]);
 
 /**
@@ -181,6 +184,8 @@ const adminView = (rec) => {
     paymentStatus: paid?.reason ?? null, // "refund" | "dispute": the payment itself, whatever else revoked the licence
     paymentRevokedAt: paid?.at ?? null,
     emailedAt: rec.emailedAt ?? null,
+    free: Boolean(rec.free),
+    freeNote: rec.freeNote ?? null,
     replacedBy: rec.replacedBy ?? null,
     reissuedFrom: rec.reissuedFrom ?? null,
   };
@@ -190,7 +195,7 @@ const ADMIN_FAIL_LIMIT = 20; // failed attempts per address ...
 const ADMIN_FAIL_WINDOW_SECONDS = 3600; // ... per hour
 
 /**
- * POST /api/tessera/admin  { action, target, reason? }. Two ways in:
+ * POST /api/tessera/admin  { action, target, reason? } (or { action: "issue_free", email, note? }). Two ways in:
  *  - Authorization: Bearer <TESSERA_ADMIN_SECRET> (the CLI; the secret must be at least 32 characters), or
  *  - the signed `__Host-tessera_admin` session cookie from "Sign in with Google" (also live in Redis as
  *    `adminsess:<id>`, so logout ends it), with an Origin header equal to the site's origin (CSRF guard on top of
@@ -220,8 +225,10 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
 
   /** @type {"bearer" | "cookie" | null} */
   let via = null;
+  /** @type {string | null} */
+  let adminEmail = null; // the signed-in admin (cookie sessions only)
   if (secret && safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) via = "bearer";
-  else if (google && (await sessionEmail(ctx, request))) via = "cookie";
+  else if (google && (adminEmail = await sessionEmail(ctx, request))) via = "cookie";
   if (!via) {
     try {
       await ctx.store.incrWithExpiry(failKey, ADMIN_FAIL_WINDOW_SECONDS);
@@ -251,6 +258,23 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
       return json({ days: await clickStats(ctx, STATS_DAYS), stripeProductId: productId });
     } catch (e) {
       ctx.log.error("admin stats failed", { error: errName(e) });
+      return json({ error: "failed" }, 500);
+    }
+  }
+  if (action === "issue_free") {
+    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "bad_email" }, 400);
+    const note = body?.note;
+    if (note !== undefined && note !== null && (typeof note !== "string" || note.length > FREE_NOTE_MAX)) return json({ error: "bad_note" }, 400);
+    try {
+      if ((await ctx.store.incrWithExpiry("rl:free", FREE_WINDOW_SECONDS)) > FREE_LIMIT) return json({ error: "too_many_free" }, 429);
+      const r = await issueFreeLicense(ctx, { email, note, by: via === "cookie" && adminEmail ? adminEmail : "cli" });
+      if (!r.ok) return json({ error: "bad_email" }, 400);
+      ctx.log.info("admin action", { action, lid: r.record.lid, via });
+      // The key is included so it can be pasted to the recipient by hand if the email fails.
+      return json({ result: "issued", lid: r.record.lid, emailed: Boolean(r.record.emailedAt), license: r.record.license });
+    } catch (e) {
+      ctx.log.error("admin action failed", { action, error: errName(e) });
       return json({ error: "failed" }, 500);
     }
   }

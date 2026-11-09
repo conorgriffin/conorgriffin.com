@@ -2,14 +2,18 @@
 // Admin CLI for the Tessera licensing server (Node 22 built-ins only).
 //
 //   TESSERA_ADMIN_SECRET=… node scripts/tessera-admin.mjs <lookup|revoke|unrevoke|reissue> <target> [--reason leaked|manual] [--base URL]
+//   TESSERA_ADMIN_SECRET=… node scripts/tessera-admin.mjs issue-free <email> [--note "who it's for"] [--base URL]
 //
 // <target> is a license id (32 hex), a full license key, or (lookup only) an email address.
+// issue-free emails a free Pro license to <email>; the optional note (max 200 characters) is private.
 // The secret comes from the environment only, so it never lands in shell history or the process list.
 import { parseArgs } from "node:util";
 
-const ACTIONS = ["lookup", "revoke", "unrevoke", "reissue"];
+const ACTIONS = ["lookup", "revoke", "unrevoke", "reissue", "issue-free"];
 const USAGE = `Usage: node scripts/tessera-admin.mjs <${ACTIONS.join("|")}> <target> [--reason leaked|manual] [--base https://www.conorgriffin.com]
-Needs TESSERA_ADMIN_SECRET in the environment. <target>: license id, license key, or an email (lookup only).`;
+       node scripts/tessera-admin.mjs issue-free <email> [--note "who it's for"] [--base https://www.conorgriffin.com]
+Needs TESSERA_ADMIN_SECRET in the environment. <target>: license id, license key, or an email (lookup only).
+issue-free gives a free Pro license and emails it; --note is private (max 200 characters).`;
 
 const fail = (message, code = 1) => {
   console.error(message);
@@ -22,6 +26,7 @@ try {
     allowPositionals: true,
     options: {
       reason: { type: "string" },
+      note: { type: "string" },
       base: { type: "string", default: "https://www.conorgriffin.com" },
       help: { type: "boolean", short: "h" },
     },
@@ -40,6 +45,8 @@ if (!ACTIONS.includes(action) || !target) fail(USAGE, 2);
 const secret = process.env.TESSERA_ADMIN_SECRET;
 if (!secret) fail("TESSERA_ADMIN_SECRET is not set.", 2);
 if (secret.length < 32) fail("TESSERA_ADMIN_SECRET must be at least 32 characters (the server ignores a shorter one). Generate one with: openssl rand -hex 32", 2);
+if (values.note !== undefined && action !== "issue-free") fail("--note only applies to issue-free.", 2);
+if (values.note !== undefined && values.note.length > 200) fail("--note must be at most 200 characters.", 2);
 if (values.reason && action !== "revoke") fail("--reason only applies to revoke.", 2);
 if (values.reason && !["leaked", "manual"].includes(values.reason)) fail("--reason must be leaked or manual.", 2);
 
@@ -47,7 +54,9 @@ if (values.reason && !["leaked", "manual"].includes(values.reason)) fail("--reas
 const url = new URL("/api/tessera/admin", values.base);
 if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") fail("--base must be https.", 2);
 
-const body = { action, target, ...(values.reason ? { reason: values.reason } : {}) };
+const body = action === "issue-free"
+  ? { action: "issue_free", email: target, ...(values.note ? { note: values.note } : {}) }
+  : { action, target, ...(values.reason ? { reason: values.reason } : {}) };
 let res;
 try {
   res = await fetch(url, {

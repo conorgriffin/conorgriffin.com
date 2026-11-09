@@ -140,7 +140,7 @@ test("lookup by lid, by license key and by email returns admin fields and never 
       { ...licenses[0], issuedAt: undefined, emailedAt: undefined },
       {
         lid: rec.lid, email: "Buyer@Example.com", issuedAt: undefined, revokedAt: null, revokeReason: null,
-        paymentStatus: null, paymentRevokedAt: null, emailedAt: undefined, replacedBy: null, reissuedFrom: null,
+        paymentStatus: null, paymentRevokedAt: null, emailedAt: undefined, free: false, freeNote: null, replacedBy: null, reissuedFrom: null,
       },
     );
     assert.equal(typeof licenses[0].issuedAt, "number");

@@ -1,6 +1,6 @@
-// Writes sample renders of the four license emails to email-preview/ for eyeballing. Fake data only.
+// Writes sample renders of the license emails to email-preview/ for eyeballing. Fake data only.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "../api/_lib/email.js";
+import { freeLicenseEmail, licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "../api/_lib/email.js";
 
 const rec = { license: "TSR1-eyJ2IjoxLCJraWQiOiJMMSIsImxpZCI6IlNBTVBMRTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzYyNjQ3NjAwLCJwcm9kIjoidGVzc2VyYS1wcm8ifQ.SAMPLE_SIGNATURE_doNotUse_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", email: "buyer@example.com" };
 const rec2 = { license: "TSR1-eyJ2IjoxLCJsaWQiOiJTQU1QTEUyIn0.SAMPLESIGNATURE2doNotUse", email: "buyer@example.com" };
@@ -10,6 +10,7 @@ const out = new URL("../email-preview/", import.meta.url);
 mkdirSync(out, { recursive: true });
 const emails = {
   license: licenseEmail(rec, support),
+  free: freeLicenseEmail(rec, support),
   reissued: reissuedEmail(rec, support),
   resend: resendEmail([rec, rec2], support),
   revoked: revokedEmail({ lid: "3f9c2a7be41d4c0a9e6b8d1f2a7c5e90", email: rec.email }, "support@conorgriffin.com"),
