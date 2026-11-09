@@ -61,7 +61,7 @@ const p = (html) => `<p class="ink" style="margin:0 0 16px;${BODY}">${html}</p>`
 
 /** One monospace key block, with an optional muted "Licensed to" line. @param {string} license @param {string} [email] */
 const keyBlock = (license, email) =>
-  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${email ? "6" : "16"}px"><tr><td class="keybox" style="font-family:${MONO};font-size:13px;line-height:1.5;color:#1e2034;background-color:#f3f2fb;border:1px solid #dcd8f3;border-radius:10px;padding:14px;word-break:break-all">${esc(license)}</td></tr></table>` +
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${email ? "6" : "16"}px"><tr><td class="keybox" style="font-family:${MONO};font-size:13px;line-height:1.5;color:#1e2034;background-color:#f3f2fb;border:1px solid #dcd8f3;border-radius:10px;padding:14px;word-break:break-all;overflow-wrap:anywhere">${esc(license)}</td></tr></table>` +
   (email ? `<p class="muted" style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:#6b6c80">Licensed to ${esc(email)}</p>` : "");
 
 /** Bulletproof button: a table cell carries the colour so Outlook honours it. @param {string} href @param {string} label */

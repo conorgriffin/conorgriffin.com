@@ -2,7 +2,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "../api/_lib/email.js";
 
-const rec = { license: "TSR1-eyJ2IjoxLCJsaWQiOiJTQU1QTEUifQ.SAMPLESIGNATUREdoNotUse", email: "buyer@example.com" };
+const rec = { license: "TSR1-eyJ2IjoxLCJraWQiOiJMMSIsImxpZCI6IlNBTVBMRTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzYyNjQ3NjAwLCJwcm9kIjoidGVzc2VyYS1wcm8ifQ.SAMPLE_SIGNATURE_doNotUse_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", email: "buyer@example.com" };
 const rec2 = { license: "TSR1-eyJ2IjoxLCJsaWQiOiJTQU1QTEUyIn0.SAMPLESIGNATURE2doNotUse", email: "buyer@example.com" };
 const support = "support@conorgriffin.com";
 
