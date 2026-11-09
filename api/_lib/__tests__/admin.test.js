@@ -291,7 +291,8 @@ test("reissue: new verifiable key for the same email, old revoked as 'reissued',
   assert.equal(mail.subject, "Your new Tessera Pro license");
   assert.ok(mail.text.includes(out.license));
   assert.ok(mail.html.includes("Enter License"));
-  assert.ok(mail.text.includes("tessera-direct://activate?key="));
+  assert.ok(mail.text.includes(`https://www.conorgriffin.com/tessera/activate#key=${encodeURIComponent(out.license)}`));
+  assert.ok(!mail.text.includes("tessera-direct://") && !mail.html.includes("tessera-direct://"));
   assert.ok(mail.text.includes("https://conorgriffin.com/tessera/license"));
   assert.ok(mail.text.includes("support@example.com"));
   assert.match(mail.text, /previous key has been replaced/);

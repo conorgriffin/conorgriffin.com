@@ -7,6 +7,9 @@ export const FIND_LICENSE_URL = `${SITE}/tessera/license`;
 /** @param {string} license */
 export const activationUrl = (license) => `tessera-direct://activate?key=${encodeURIComponent(license)}`;
 
+/** Gmail strips custom-scheme hrefs, so emails link to this https page, which hands the key to the app. @param {string} license */
+export const activationLink = (license) => `https://www.conorgriffin.com/tessera/activate#key=${encodeURIComponent(license)}`;
+
 /** @param {string} s */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -28,14 +31,22 @@ export function createMailer({ apiKey, from, replyTo, fetch: fetchImpl = fetch }
         headers,
         body: JSON.stringify({ from, to: [to], subject, text, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
       });
-      if (!res.ok) throw new Error(`resend failed (${res.status})`);
+      if (!res.ok) {
+        // Resend explains failures in the body (e.g. a domain that isn't verified). Keep only its short error name.
+        let name = "";
+        try {
+          const body = await res.json();
+          if (typeof body?.name === "string" && /^[a-z_]{1,64}$/i.test(body.name)) name = `: ${body.name}`;
+        } catch {}
+        throw Object.assign(new Error(`resend failed (${res.status})${name}`), { status: res.status, mailer: true });
+      }
     },
   };
 }
 
 /** @param {{ license: string }} rec */
 function licenseBlockText(rec) {
-  return `${rec.license}\n\nOpen in Tessera: ${activationUrl(rec.license)}`;
+  return `${rec.license}\n\nOpen in Tessera: ${activationLink(rec.license)}`;
 }
 
 /** @param {{ license: string, email: string }} rec @param {string} supportEmail */
@@ -48,7 +59,7 @@ Your license key:
 ${rec.license}
 
 To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
-${activationUrl(rec.license)}
+${activationLink(rec.license)}
 
 If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
 
@@ -63,7 +74,7 @@ Conor
 <p>Thanks for buying Tessera Pro.</p>
 <p>Your license key:</p>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:#f3f4f8;padding:12px;border-radius:8px">${esc(rec.license)}</p>
-<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationUrl(rec.license))}">open it in Tessera</a> on your Mac.</p>
+<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationLink(rec.license))}">open it in Tessera</a> on your Mac.</p>
 <p>If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.</p>
 <p><a href="${DOWNLOAD_URL}">Download Tessera</a> · <a href="${FIND_LICENSE_URL}">Lost this email? Find your license</a></p>
 <p>Questions? Reply to this email or write to <a href="mailto:${esc(supportEmail)}">${esc(supportEmail)}</a>.</p>
@@ -81,7 +92,7 @@ Your new license key:
 ${rec.license}
 
 To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
-${activationUrl(rec.license)}
+${activationLink(rec.license)}
 
 If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
 
@@ -95,7 +106,7 @@ Conor
 <p>Here is your new Tessera Pro license key. Your previous key has been replaced and will stop working, so please use this one from now on.</p>
 <p>Your new license key:</p>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:#f3f4f8;padding:12px;border-radius:8px">${esc(rec.license)}</p>
-<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationUrl(rec.license))}">open it in Tessera</a> on your Mac.</p>
+<p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or <a href="${esc(activationLink(rec.license))}">open it in Tessera</a> on your Mac.</p>
 <p>If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.</p>
 <p><a href="${FIND_LICENSE_URL}">Lost this email? Find your license</a></p>
 <p>Questions? Reply to this email or write to <a href="mailto:${esc(supportEmail)}">${esc(supportEmail)}</a>.</p>
@@ -123,7 +134,7 @@ Conor
 ${recs
   .map(
     (r) => `<p style="font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:#f3f4f8;padding:12px;border-radius:8px">${esc(r.license)}</p>
-<p><a href="${esc(activationUrl(r.license))}">Open in Tessera</a></p>`,
+<p><a href="${esc(activationLink(r.license))}">Open in Tessera</a></p>`,
   )
   .join("\n")}
 <p>To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Tessera ignores line breaks and spaces.</p>

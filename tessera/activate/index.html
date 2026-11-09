@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open in Tessera</title>
+    <meta name="description" content="Activate your Tessera Pro license." />
+    <meta name="author" content="Conor Griffin" />
+    <meta property="og:site_name" content="Conor Griffin" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://conorgriffin.com/tessera/activate" />
+    <meta property="og:title" content="Open in Tessera" />
+    <meta property="og:description" content="Activate your Tessera Pro license." />
+    <meta name="twitter:card" content="summary" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/tessera-icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Geist:wght@400;500;600&display=swap" />
+    <script>
+      (function () {
+        document.documentElement.classList.add("js");
+        try {
+          var t = localStorage.getItem("theme");
+          if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches))
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body data-page="activate">
+    <div id="root"></div>
+    <script type="module" src="/src/tessera/main.tsx"></script>
+  </body>
+</html>
