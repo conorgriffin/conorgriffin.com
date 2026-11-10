@@ -47,6 +47,20 @@ const guides: Guide[] = [
     tip: <>Tessera downloads the issuer's public keys straight from the issuer over HTTPS. Nothing from your token is sent.</>,
   },
   {
+    id: "internal-issuers",
+    title: "Fetch keys from an internal issuer",
+    pro: true,
+    intro: "Verify tokens from a sign-in server on your company's network, including one that uses your company's own certificates.",
+    steps: [
+      <>Choose <UI>Fetch keys from issuer</UI>. If the issuer is on a private network, Tessera stops and asks first. Choose <UI>Allow This Issuer…</UI>, then <UI>Allow</UI>. Tessera remembers the host, and you can remove it later in <UI>Settings › Privacy</UI>.</>,
+      <>If Tessera says the issuer's certificate isn't trusted by this Mac, your company signs its internal sites with its own certificate authority. On a work Mac, IT usually installs it for you. If not, ask IT for the root certificate (a <code>.cer</code>, <code>.crt</code> or <code>.pem</code> file).</>,
+      <>Double-click the file. Keychain Access opens and adds it to your <UI>login</UI> keychain.</>,
+      <>In Keychain Access, search for the certificate's name and double-click it. Open <UI>Trust</UI>, set <UI>When using this certificate</UI> to <UI>Always Trust</UI>, then close the window and enter your password.</>,
+      <>Back in Tessera, choose <UI>Fetch</UI> again. If Safari opens the issuer's address without a warning, Tessera will trust it too.</>,
+    ],
+    tip: <>Only trust a root certificate your IT team gave you, because a trusted root can vouch for any website. Tessera never skips certificate checks and never fetches from loopback or link-local addresses.</>,
+  },
+  {
     id: "jwe",
     title: "Decrypt a JWE",
     intro: "Read an encrypted token and the token nested inside it.",
