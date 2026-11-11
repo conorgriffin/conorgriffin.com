@@ -20,6 +20,7 @@ export default defineConfig(({ isSsrBuild }) => ({
             "tessera-terms": "tessera/terms/index.html",
             "tessera-admin": "tessera/admin/index.html",
             "tessera-guide": "tessera/guide/index.html",
+            "tessera-learn": "tessera/learn/index.html",
           },
         },
       },

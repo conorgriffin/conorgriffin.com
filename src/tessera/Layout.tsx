@@ -3,7 +3,7 @@ import { SiteHeader, useReveal } from "@/components/site";
 import { links } from "@/content/site";
 import { TesseraIcon } from "./TesseraIcon";
 
-export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "activate" | "license" | "terms" | "admin" | "guide";
+export type TesseraPageId = "home" | "privacy" | "support" | "thanks" | "activate" | "license" | "terms" | "admin" | "guide" | "learn";
 
 export const paths: Record<TesseraPageId, string> = {
   home: "/tessera",
@@ -15,11 +15,12 @@ export const paths: Record<TesseraPageId, string> = {
   terms: "/tessera/terms",
   admin: "/tessera/admin",
   guide: "/tessera/guide",
+  learn: "/tessera/learn",
 };
 
 export const email = links.email.replace(/^mailto:/, "");
 
-const navItems: [TesseraPageId, string][] = [["home", "Tessera"], ["guide", "Guide"], ["support", "Support"]];
+const navItems: [TesseraPageId, string][] = [["home", "Tessera"], ["learn", "Learn"], ["guide", "Guide"], ["support", "Support"]];
 
 export function TesseraLayout({ current, children }: { current: TesseraPageId; children: ReactNode }) {
   useReveal();
@@ -45,6 +46,7 @@ export function TesseraLayout({ current, children }: { current: TesseraPageId; c
             <p className="text-sm text-muted-foreground">Tessera for Mac · by <a href="/" className="underline-offset-4 hover:text-foreground hover:underline">Conor Griffin</a></p>
           </div>
           <ul className="flex gap-6 text-sm">
+            <li><a href={paths.learn} className="underline-offset-4 hover:text-primary hover:underline">Learn</a></li>
             <li><a href={paths.guide} className="underline-offset-4 hover:text-primary hover:underline">Guide</a></li>
             <li><a href={paths.privacy} className="underline-offset-4 hover:text-primary hover:underline">Privacy policy</a></li>
             <li><a href={paths.terms} className="underline-offset-4 hover:text-primary hover:underline">Terms of sale</a></li>
