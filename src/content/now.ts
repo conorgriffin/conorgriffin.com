@@ -6,6 +6,11 @@ export type NowItem = {
 // Short, easy-to-edit snapshots of what I'm focused on right now.
 export const now: NowItem[] = [
   {
+    title: "The Orchestrate runtime",
+    blurb:
+      "My main objective: owning the runtime that handles customer integrations on Workday Orchestrate and executes some of the most critical workloads for some of the world's biggest companies.",
+  },
+  {
     title: "Orchestrate for agents",
     blurb:
       "Helping my team open Workday Orchestrate up to AI agents, so integrations are exposed as tools that MCP servers and agents can call.",

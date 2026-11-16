@@ -99,7 +99,7 @@ export function App() {
         </Section>
 
         <Section id="now" eyebrow="Now" title="What I'm working on.">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-3">
             {now.map((n) => (
               <article key={n.title} className="rounded-2xl border bg-card p-6 transition hover:border-primary/50 hover:shadow-lg">
                 <h3 className="text-xl font-medium">{n.title}</h3>
