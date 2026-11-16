@@ -31,7 +31,7 @@ export const experience: ExperienceCompany[] = [
         start: "May 2026",
         end: "Present",
         summary:
-          "Enabling Orchestrate for agents (tools for MCP servers), involvement in Orchestrate's Copilot, and driving agentic SDLC practices across the team.",
+          "Enabling Orchestrate for agents (tools for MCP servers) and driving agentic SDLC practices across the team.",
       },
       { role: "Software Engineering Manager", start: "Jun 2022", end: "May 2026" },
       { role: "Principal Software Engineer", start: "May 2021", end: "Jun 2022" },
