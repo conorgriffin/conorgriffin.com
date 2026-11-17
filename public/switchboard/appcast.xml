@@ -5,5 +5,15 @@
     <link>https://conorgriffin.com/switchboard</link>
     <description>Updates for Audio Switchboard, the audio device switcher for the Mac menu bar.</description>
     <language>en</language>
+    <item>
+      <title>Version 1.4.0</title>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 17 Nov 2026 23:24:58 +0000</pubDate>
+      <enclosure url="https://github.com/conorgriffin/switchboard-releases/releases/download/v1.4.0/AudioSwitchboard-1.4.0.dmg"
+                 sparkle:edSignature="uHRgHRr/z6Sqi9EYQxve6ThMnQ1pQrBZbtPVP/CVDBhCe5UkQj1oT4JuSiHfctzpYdc8PnwIXkZDa/rGnNXLDw==" length="5409564"
+                 type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
