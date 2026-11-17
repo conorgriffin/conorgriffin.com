@@ -150,8 +150,37 @@ export async function issueLicense(ctx, sessionId, opts = {}) {
     if (!winnerRec) throw new Error("session claimed but licence missing");
     return { ok: true, record: winnerRec, created: false };
   }
+  await noteSale(ctx);
   await finalize(ctx, rec);
   return { ok: true, record: (await getLicense(ctx, lid)) ?? rec, created: true };
+}
+
+/**
+ * Sales spike alert: counts paid licences per app per clock hour and emails the owner when the count reaches
+ * SALES_ALERT_PER_HOUR (default 5), and again at every 10× that, so a stolen-card spree can be refunded before the
+ * card holders dispute it. Free licences don't count. Never throws: a sale must not fail because of the alert.
+ */
+async function noteSale(/** @type {any} */ ctx) {
+  try {
+    const threshold = Math.max(1, Number(ctx.env.SALES_ALERT_PER_HOUR) || 5);
+    const hour = new Date(ctx.now()).toISOString().slice(0, 13); // e.g. 2026-11-17T16 (UTC)
+    const count = await ctx.store.incrWithExpiry(`sales:hour:${hour}`, 2 * 3600);
+    if (count !== threshold && count % (threshold * 10) !== 0) return;
+    const to = ctx.env.SALES_ALERT_EMAIL || ctx.env.SUPPORT_EMAIL;
+    if (!to) return;
+    const app = appOf(ctx);
+    const subject = `${app.productName}: ${count} sales in one hour`;
+    const text = `${count} ${app.productName} licenses have been sold in the hour starting ${hour}:00 UTC (alert threshold: ${threshold} per hour).
+
+If these look like fraud (for example one buyer, or many buyers with similar emails), refund them in Stripe now, before the card holders dispute them: a refund only loses the fees, a dispute costs a dispute fee each. Every refund revokes its license automatically.
+
+Stripe payments: https://dashboard.stripe.com/payments
+Admin page: https://www.conorgriffin.com${app.pages.admin}
+`;
+    await ctx.mailer.send({ to, subject, text, idempotencyKey: `${app.slug}-sales-alert-${hour}-${count}` });
+  } catch (e) {
+    ctx.log.warn("sales alert failed", { error: errName(e) });
+  }
 }
 
 /** Index, dashboard metadata and email. Safe to run more than once. */

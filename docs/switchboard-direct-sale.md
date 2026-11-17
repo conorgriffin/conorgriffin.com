@@ -48,6 +48,7 @@ Production scope only, marked Sensitive (never Preview), as for Tessera.
 | `SWITCHBOARD_RESEND_FROM` | Optional. Defaults to `Audio Switchboard <switchboard@conorgriffin.com>`. Reply-To is `SUPPORT_EMAIL` |
 | `SWITCHBOARD_ADMIN_SECRET` | Optional bearer token for `POST /api/switchboard/admin` and the CLI. At least 32 characters (`openssl rand -hex 32`), otherwise ignored |
 | `SWITCHBOARD_ADMIN_EMAILS` | Optional comma-separated Google accounts allowed to act on Audio Switchboard from the admin page. Each must also be in `TESSERA_ADMIN_EMAILS`, which controls who can sign in at all |
+| `SALES_ALERT_PER_HOUR`, `SALES_ALERT_EMAIL` | Optional, shared by every app. When paid licenses for one app reach this many in a clock hour (default 5), and again at 10× that, the server emails `SALES_ALERT_EMAIL` (default `SUPPORT_EMAIL`), so a stolen-card spree can be refunded before it turns into disputes |
 
 **Shared with Tessera, already set, nothing to change**: `STRIPE_SECRET_KEY` (the same Stripe account; the product ID tells the apps apart), `STRIPE_API_VERSION`, `RESEND_API_KEY`, `SUPPORT_EMAIL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TESSERA_ADMIN_SESSION_SECRET`, `TESSERA_ADMIN_BASE_URL`.
 
