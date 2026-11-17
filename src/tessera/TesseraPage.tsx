@@ -2,6 +2,8 @@ import { TesseraLayout, paths } from "./Layout";
 import { TesseraIcon, TileBullet, tileColors } from "./TesseraIcon";
 import { EnlargeButton, LightboxProvider } from "./Lightbox";
 import { useProPrice } from "./price";
+import { BrewCommand } from "./BrewCommand";
+import type { ReactNode } from "react";
 
 const features: { title: string; points: string[] }[] = [
   {
@@ -74,11 +76,12 @@ const proHighlights = [
   "Menu bar peek at copied tokens",
 ];
 
-const faqs: [string, string][] = [
+const faqs: [string, ReactNode][] = [
   ["Is it really free?", "Yes. Decoding, verifying, decrypting, the security checks and building and signing tokens are all free, with no time limit. Tessera Pro adds saved keys, issuer key fetching, JWE encryption, the menu bar popover and history."],
   ["Why not just use jwt.io?", "jwt.io is great for a quick look. Tessera is for when you'd rather not paste a production token into a website, need to decrypt a JWE, or want your keys and history kept on your Mac. It's also one ⌘V away, with plain-English security checks and a live expiry countdown."],
   ["Is Tessera Pro a subscription?", "No. It's a one-time purchase, shown in your local currency at checkout."],
   ["Is the download safe to open?", "Yes. It's signed with my Apple Developer ID and notarized by Apple, so it opens like any other Mac app. Updates arrive inside the app."],
+  ["Can I install it with Homebrew?", <>Yes. Run this in Terminal to install the direct-download version:<BrewCommand className="my-3" />Tessera keeps itself up to date after that, so you don't need <code>brew upgrade</code>. Tessera Pro is the same license key as with the download.</>],
   ["What's the difference between this and the App Store version?", "It's the same app. The direct version updates itself and Tessera Pro is a license key sent by email. The App Store version uses Apple's in-app purchase. The two purchases are separate."],
   ["Does Tessera send my tokens anywhere?", "No. Tokens, keys and history never leave your Mac. Tessera only goes online to fetch an issuer's public keys when you ask, which goes straight to the issuer and sends nothing from your token. The direct-download version checks this site for updates and to keep your license valid. It never sends anything about you or your tokens."],
   ["What do I need?", "A Mac running macOS 15 or later."],
@@ -146,6 +149,8 @@ export function TesseraPage() {
                   Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span>
                 </a>
               </div>
+              <p className="mt-5 text-sm text-muted-foreground">Or install with Homebrew:</p>
+              <BrewCommand className="mt-2" />
               <div className="mt-6 max-w-xl rounded-2xl border bg-card p-5">
                 <p className="flex flex-wrap items-center gap-2 font-medium">
                   <span className="rounded-full bg-tessera-navy px-2 py-0.5 text-xs font-medium text-tessera-ink">Pro</span>
@@ -300,6 +305,8 @@ export function TesseraPage() {
               <a href="/tessera/download" className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90">Download <span aria-hidden="true">↓</span></a>
               <a href="/tessera/buy" className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-card">Buy Pro{price && <span className="font-normal opacity-70">{price}</span>} <span aria-hidden="true">→</span></a>
             </div>
+            <p className="mt-5 text-sm text-muted-foreground">Or with Homebrew:</p>
+            <BrewCommand className="mt-2" />
           </div>
         </div>
         <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
