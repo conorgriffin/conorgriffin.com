@@ -1,5 +1,8 @@
 // HTTP handlers, written against a context so tests can call them with fakes.
-// The files in api/tessera/ are thin wrappers that pass in the real context.
+// The files in api/[app]/ are thin wrappers that pass in the real context. One function serves every app
+// (apps.js): `getCtx(slug)` returns that app's context, and a handler reads the app from `ctx.app` (Tessera when a
+// test context has none). In the doc comments below, /api/tessera/x stands for /api/<app>/x.
+import { DEFAULT_APP, allApps, appFromRequest } from "./apps.js";
 import { activationUrl } from "./email.js";
 import { b64urlDecode, safeEqual, sha256Hex, verifyStripeSignature } from "./crypto.js";
 import {
@@ -8,8 +11,8 @@ import {
   startSession, verifyIdToken, verifySignedValue,
 } from "./adminAuth.js";
 import {
-  SESSION_MAX_AGE_SECONDS, buildRevocationList, findLicenses, handleEvent, issueFreeLicense, issueLicense, paymentRevocation, reconcile,
-  reissueLicense, resendLicenses, revokeLicense, unrevokeLicense,
+  SESSION_MAX_AGE_SECONDS, appOf, buildRevocationList, findLicenses, handleEvent, issueFreeLicense, issueLicense, paymentRevocation, reconcile,
+  reconcileAll, reissueLicense, resendLicenses, revokeLicense, unrevokeLicense,
 } from "./licensing.js";
 
 /** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
@@ -18,10 +21,14 @@ const json = (body, status = 200, headers = {}) =>
 
 const errName = (/** @type {any} */ e) => (e && e.name) || "Error";
 
-/** @param {(() => any)} getCtx */
-function withContext(getCtx) {
+/**
+ * The context for the app the request is addressed to (Tessera when the URL names none).
+ * @param {(slug: string) => any} getCtx @param {Request} [request]
+ */
+function withContext(getCtx, request) {
+  const app = (request && appFromRequest(request)) || DEFAULT_APP;
   try {
-    return { ctx: getCtx() };
+    return { ctx: getCtx(app.slug) };
   } catch (e) {
     // The message names the missing setting, never a value.
     console.error(JSON.stringify({ level: "error", msg: "not configured", error: errName(e), detail: String(/** @type {any} */ (e)?.message ?? "") }));
@@ -31,11 +38,11 @@ function withContext(getCtx) {
 
 /** POST /api/tessera/stripe-webhook */
 export async function stripeWebhook(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
   const raw = await request.text(); // signature is over the exact bytes
   const check = verifyStripeSignature({
-    payload: raw, header: request.headers.get("stripe-signature"), secret: ctx.env.STRIPE_WEBHOOK_SECRET, nowMs: ctx.now(),
+    payload: raw, header: request.headers.get("stripe-signature"), secret: ctx.env[appOf(ctx).env.webhookSecret], nowMs: ctx.now(),
   });
   if (!check.ok) {
     if (check.reason === "no_secret") return json({ error: "not_configured" }, 500);
@@ -64,14 +71,15 @@ const SESSION_ID = /^cs_[A-Za-z0-9_]{8,250}$/;
 
 /** GET /api/tessera/license?session_id=cs_… */
 export async function licenseForSession(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
   const sessionId = new URL(request.url).searchParams.get("session_id") ?? "";
-  const notFound = () => json({ error: "not_found", help: "/tessera/license" }, 404);
+  const app = appOf(ctx);
+  const notFound = () => json({ error: "not_found", help: app.pages.license }, 404);
   if (!SESSION_ID.test(sessionId)) return notFound();
   try {
     const r = await issueLicense(ctx, sessionId, { maxAgeSeconds: SESSION_MAX_AGE_SECONDS, refuseReissued: true });
-    if (r.ok) return json({ license: r.record.license, email: r.record.email, activationUrl: activationUrl(r.record.license) });
+    if (r.ok) return json({ license: r.record.license, email: r.record.email, activationUrl: activationUrl(r.record.license, app) });
     if (r.reason === "unpaid") return json({ error: "payment_pending" }, 409);
     return notFound();
   } catch (e) {
@@ -82,7 +90,7 @@ export async function licenseForSession(/** @type {() => any} */ getCtx, /** @ty
 
 /** POST /api/tessera/resend  { email } */
 export async function resend(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
   const started = ctx.now();
   /** @type {any} */
@@ -105,9 +113,9 @@ export async function resend(/** @type {() => any} */ getCtx, /** @type {Request
   return json({ ok: true });
 }
 
-/** GET /api/tessera/revocations. Reads no request headers and logs nothing about the caller. */
-export async function revocations(/** @type {() => any} */ getCtx) {
-  const { ctx, response } = withContext(getCtx);
+/** GET /api/tessera/revocations. Reads only the URL path (to pick the app), no request headers, and logs nothing about the caller. */
+export async function revocations(/** @type {(slug: string) => any} */ getCtx, /** @type {Request} */ request) {
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
   try {
     return Response.json(await buildRevocationList(ctx), {
@@ -119,12 +127,28 @@ export async function revocations(/** @type {() => any} */ getCtx) {
   }
 }
 
-/** GET /api/tessera/reconcile (Vercel Cron, daily) */
-export async function reconcileHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+const ALL_RECONCILE_PATH = /^\/api\/all\/reconcile\/?$/;
+
+/**
+ * GET /api/<app>/reconcile reconciles that app; GET /api/all/reconcile (the daily Vercel Cron in vercel.json)
+ * reconciles every registered app that is configured, one after the other, each failure kept to its own app.
+ * Same CRON_SECRET bearer check for both.
+ */
+export async function reconcileHandler(/** @type {(slug: string) => any} */ getCtx, /** @type {Request} */ request) {
+  const all = ALL_RECONCILE_PATH.test(new URL(request.url).pathname);
+  const { ctx, response } = withContext(getCtx, all ? undefined : request);
   if (response) return response;
   const secret = ctx.env.CRON_SECRET;
   if (!secret || !safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return json({ error: "unauthorized" }, 401);
+  if (all) {
+    try {
+      const result = await reconcileAll(getCtx, allApps(), ctx.log);
+      return json({ ok: result.errors === 0, ...result }, result.errors === 0 ? 200 : 500);
+    } catch (e) {
+      ctx.log.error("reconcile failed", { error: errName(e) });
+      return json({ error: "reconcile_failed" }, 500);
+    }
+  }
   try {
     const result = await reconcile(ctx);
     return json({ ok: result.errors === 0, ...result }, result.errors === 0 ? 200 : 500);
@@ -148,15 +172,16 @@ const ADMIN_REVOKE_REASONS = new Set(["leaked", "manual"]);
  * Reads an admin target: a licence id, a full licence key (any whitespace; only the payload is read, the
  * signature is not checked because we only look the id up), or an email address.
  * @param {unknown} raw
+ * @param {import("./apps.js").AppConfig} [app] whose license prefix is recognised (default Tessera)
  * @returns {{ lid: string } | { email: string } | null}
  */
-export function parseAdminTarget(raw) {
+export function parseAdminTarget(raw, app = DEFAULT_APP) {
   if (typeof raw !== "string" || raw.length > 4096) return null;
   const trimmed = raw.trim();
   const compact = trimmed.replace(/\s+/g, "");
-  if (compact.startsWith("TSR1-")) {
+  if (compact.startsWith(app.licensePrefix)) {
     try {
-      const payloadPart = compact.slice(5).split(".")[0];
+      const payloadPart = compact.slice(app.licensePrefix.length).split(".")[0];
       const lid = JSON.parse(b64urlDecode(payloadPart).toString("utf8"))?.lid;
       return typeof lid === "string" && LID.test(lid) ? { lid } : null;
     } catch {
@@ -205,18 +230,20 @@ const ADMIN_FAIL_WINDOW_SECONDS = 3600; // ... per hour
  * Nothing here logs emails or keys.
  */
 export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
   if (!adminHostMatches(request, ctx.env)) return json({ error: "not_found" }, 404);
+  const app = appOf(ctx);
   const secret = adminSecret(ctx);
-  const google = googleAdminConfig(ctx.env);
+  const google = googleAdminConfig(ctx.env, app);
   if (!secret && !google) return json({ error: "not_found" }, 404);
+  const adminStore = ctx.adminStore ?? ctx.store; // failed-attempt counters are per address, not per app
 
   // Too many recent failures from this address: refuse everything, even a correct credential, so guessing can't go on.
   const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   const failKey = `rl:adminfail:${sha256Hex(ip)}`;
   try {
-    if (Number((await ctx.store.get(failKey)) ?? 0) >= ADMIN_FAIL_LIMIT) {
+    if (Number((await adminStore.get(failKey)) ?? 0) >= ADMIN_FAIL_LIMIT) {
       return json({ error: "too_many_attempts" }, 429, { "Retry-After": String(ADMIN_FAIL_WINDOW_SECONDS) });
     }
   } catch (e) {
@@ -231,7 +258,7 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
   else if (google && (adminEmail = await sessionEmail(ctx, request))) via = "cookie";
   if (!via) {
     try {
-      await ctx.store.incrWithExpiry(failKey, ADMIN_FAIL_WINDOW_SECONDS);
+      await adminStore.incrWithExpiry(failKey, ADMIN_FAIL_WINDOW_SECONDS);
     } catch (e) {
       ctx.log.warn("admin rate limit update failed", { error: errName(e) });
     }
@@ -254,7 +281,8 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
   if (action === "stats") {
     try {
       // The product id isn't secret; the admin page uses it to link to the product in the Stripe Dashboard.
-      const productId = /^prod_[A-Za-z0-9]+$/.test(ctx.env.TESSERA_STRIPE_PRODUCT_ID ?? "") ? ctx.env.TESSERA_STRIPE_PRODUCT_ID : null;
+      const configuredId = ctx.env[app.env.productId];
+      const productId = /^prod_[A-Za-z0-9]+$/.test(configuredId ?? "") ? configuredId : null;
       return json({ days: await clickStats(ctx, STATS_DAYS), stripeProductId: productId });
     } catch (e) {
       ctx.log.error("admin stats failed", { error: errName(e) });
@@ -278,7 +306,7 @@ export async function adminHandler(/** @type {() => any} */ getCtx, /** @type {R
       return json({ error: "failed" }, 500);
     }
   }
-  const target = parseAdminTarget(body?.target);
+  const target = parseAdminTarget(body?.target, app);
   if (!target) return json({ error: "bad_target" }, 400);
   if (!("lid" in target) && action !== "lookup") return json({ error: "email_only_for_lookup" }, 400);
   const reason = body?.reason ?? "leaked";
@@ -315,9 +343,11 @@ function adminRedirect(origin, error, cookies = []) {
 
 /** Shared start of the four routes: the context, and a 404 whatever the verb when Google admin isn't configured or the host is wrong. */
 function adminAuthRoute(/** @type {() => any} */ getCtx, /** @type {Request} */ request, /** @type {string} */ method) {
-  const { ctx, response } = withContext(getCtx);
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return { response };
   if (!adminHostMatches(request, ctx.env)) return { response: json({ error: "not_found" }, 404) };
+  // Sign-in is Tessera's route set only: the Google client has one redirect URI, and one login covers every app.
+  if (appOf(ctx).slug !== DEFAULT_APP.slug) return { response: json({ error: "not_found" }, 404) };
   const cfg = googleAdminConfig(ctx.env);
   if (!cfg) return { response: json({ error: "not_found" }, 404) };
   if (request.method !== method) return { response: json({ error: "method_not_allowed" }, 405, { Allow: method }) };
@@ -399,7 +429,8 @@ export async function adminLogout(/** @type {() => any} */ getCtx, /** @type {Re
 
 // ---------------------------------------------------------------- buy and download clicks
 
-const GO_TARGETS = /** @type {Record<string, string>} */ ({ buy: "TESSERA_PAYMENT_LINK_URL", download: "TESSERA_DOWNLOAD_URL" });
+/** @param {import("./apps.js").AppConfig} app @returns {Record<string, string>} */
+const goTargets = (app) => ({ buy: app.env.paymentLink, download: app.env.downloadUrl });
 const CLICK_TTL_SECONDS = 400 * 24 * 60 * 60;
 const STATS_DAYS = 30;
 // Link previews and crawlers follow links too; they shouldn't count as people.
@@ -413,13 +444,15 @@ const clickKey = (/** @type {string} */ to, /** @type {string} */ day) => `click
  * about the visitor is stored), then 302s to the URL in the environment. Counting is best effort: if Redis
  * is down or not configured, the visitor is still sent on.
  */
-export async function goHandler(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
+export async function goHandler(/** @type {(slug: string) => any} */ getCtx, /** @type {Request} */ request) {
+  const app = appFromRequest(request) ?? DEFAULT_APP;
+  const targets = goTargets(app);
   const to = new URL(request.url).searchParams.get("to") ?? "";
-  const name = Object.hasOwn(GO_TARGETS, to) ? GO_TARGETS[to] : undefined;
-  if (!name || !salesOpen(process.env)) return new Response("Not found", { status: 404 });
+  const name = Object.hasOwn(targets, to) ? targets[to] : undefined;
+  if (!name || !salesOpen(process.env, app)) return new Response("Not found", { status: 404 });
   if (request.method === "GET" && !BOT_UA.test(request.headers.get("user-agent") ?? "")) {
     try {
-      const ctx = getCtx();
+      const ctx = getCtx(app.slug);
       await ctx.store.incrWithExpiry(clickKey(to, utcDay(ctx.now())), CLICK_TTL_SECONDS);
     } catch (e) {
       console.warn(JSON.stringify({ level: "warn", msg: "click count failed", to, error: errName(e) }));
@@ -443,9 +476,9 @@ export function redirectTo(/** @type {() => any} */ getEnv, /** @type {string} *
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });
 }
 
-/** Sales are hidden until launch: VITE_TESSERA_SALES_OPEN=1 (also read at build time by the /tessera page). */
-export function salesOpen(/** @type {Record<string, string | undefined>} */ env) {
-  return env.VITE_TESSERA_SALES_OPEN === "1";
+/** Sales are hidden until launch: VITE_<APP>_SALES_OPEN=1 (also read at build time by the app's page). */
+export function salesOpen(/** @type {Record<string, string | undefined>} */ env, /** @type {import("./apps.js").AppConfig} */ app = DEFAULT_APP) {
+  return env[app.env.salesOpen] === "1";
 }
 
 // Countries whose own currency we might sell in. Anywhere else gets the price's default currency,
@@ -458,30 +491,33 @@ const COUNTRY_CURRENCY = /** @type {Record<string, string>} */ ({
   CA: "cad", AU: "aud", NZ: "nzd", CH: "chf", SE: "sek", NO: "nok", DK: "dkk", PL: "pln", JP: "jpy", IN: "inr",
 });
 const PRICE_TTL_MS = 60 * 60 * 1000;
-/** @type {{ at: number, value: { default: string, amounts: Record<string, number> } } | undefined} */
-let priceCache;
+/** One cached Stripe price per app. @type {Map<string, { at: number, value: { default: string, amounts: Record<string, number> } }>} */
+const priceCache = new Map();
 
-/** Test hook: forget the cached Stripe price. */
-export function resetPriceCache() { priceCache = undefined; }
+/** Test hook: forget the cached Stripe prices. */
+export function resetPriceCache() { priceCache.clear(); }
 
 /**
- * GET /api/tessera/price: Tessera Pro's price in the visitor's currency, from Stripe.
+ * GET /api/<app>/price: the app's price in the visitor's currency, from Stripe.
  * The country comes from Vercel's x-vercel-ip-country header and is never logged or stored.
  * Returns { currency: "eur", amount: 999 } (amount in the currency's minor unit, as Stripe has it).
  */
-export async function tesseraPrice(/** @type {() => any} */ getCtx, /** @type {Request} */ request) {
-  const { ctx, response } = withContext(getCtx);
+export async function appPrice(/** @type {(slug: string) => any} */ getCtx, /** @type {Request} */ request) {
+  const { ctx, response } = withContext(getCtx, request);
   if (response) return response;
-  if (!salesOpen(ctx.env)) return json({ error: "not_found" }, 404);
-  const productId = ctx.env.TESSERA_STRIPE_PRODUCT_ID;
+  const app = appOf(ctx);
+  if (!salesOpen(ctx.env, app)) return json({ error: "not_found" }, 404);
+  const productId = ctx.env[app.env.productId];
   if (!productId) return json({ error: "not_configured" }, 503);
   try {
-    if (!priceCache || ctx.now() - priceCache.at > PRICE_TTL_MS) {
+    let hit = priceCache.get(app.slug);
+    if (!hit || ctx.now() - hit.at > PRICE_TTL_MS) {
       const value = await ctx.stripe.retrieveProductPrices(productId);
       if (!value) return json({ error: "not_configured" }, 503);
-      priceCache = { at: ctx.now(), value };
+      hit = { at: ctx.now(), value };
+      priceCache.set(app.slug, hit);
     }
-    const { value } = priceCache;
+    const { value } = hit;
     const country = (request.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
     const local = COUNTRY_CURRENCY[country];
     const currency = local && local in value.amounts ? local : value.default;
@@ -492,3 +528,6 @@ export async function tesseraPrice(/** @type {() => any} */ getCtx, /** @type {R
     return json({ error: "try_again" }, 502);
   }
 }
+
+/** Kept under its old name for existing callers and tests. */
+export const tesseraPrice = appPrice;

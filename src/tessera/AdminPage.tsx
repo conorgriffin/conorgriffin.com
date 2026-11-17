@@ -1,9 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { PageIntro, TesseraLayout } from "./Layout";
 
-// Private admin page for Tessera licenses. It holds no secrets: every call goes to /api/tessera/admin*, which
-// checks the signed session cookie set by "Sign in with Google". Keys are only ever sent in request bodies.
+// Private admin page for the licenses of every app sold from this site (Tessera, Audio Switchboard): an app picker
+// chooses which app's records the calls act on. It holds no secrets: sign-in goes through /api/tessera/admin-* and
+// every action to /api/<app>/admin, which checks the signed session cookie set by "Sign in with Google" against
+// that app's allowlist. Keys are only ever sent in request bodies.
+
+interface AdminApp {
+  slug: "tessera" | "switchboard";
+  name: string;
+  /** What the buyer bought, as in the license email. */
+  product: string;
+  /** The Buy button's name on the site. */
+  buy: string;
+}
+
+const ADMIN_APPS: AdminApp[] = [
+  { slug: "tessera", name: "Tessera", product: "Tessera Pro", buy: "Buy Pro" },
+  { slug: "switchboard", name: "Audio Switchboard", product: "Audio Switchboard", buy: "Buy" },
+];
+
+const AdminAppContext = createContext<AdminApp>(ADMIN_APPS[0]);
 
 interface License {
   lid: string;
@@ -94,8 +112,8 @@ const formatDate = (seconds: number) =>
   new Date(seconds * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
 /** POSTs an admin action. The key (when searching by key) travels in the body, never in a URL. */
-async function adminRequest(body: Record<string, string>): Promise<{ status: number; data: any }> {
-  const res = await fetch("/api/tessera/admin", {
+async function adminRequest(app: AdminApp, body: Record<string, string>): Promise<{ status: number; data: any }> {
+  const res = await fetch(`/api/${app.slug}/admin`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -129,6 +147,7 @@ export function AdminPage() {
   const [session, setSession] = useState<Session>({ kind: "loading" });
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [app, setApp] = useState<AdminApp>(ADMIN_APPS[0]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -194,7 +213,7 @@ export function AdminPage() {
         {session.kind === "out" && (
           <section className={`mt-10 ${panel}`}>
             <h2 className="text-2xl font-medium">Sign in</h2>
-            <p className="mt-3 leading-relaxed text-tessera-panel-muted">This page is for managing Tessera licenses. Sign in with the Google account that has access.</p>
+            <p className="mt-3 leading-relaxed text-tessera-panel-muted">This page is for managing licenses. Sign in with the Google account that has access.</p>
             {loginError && <p role="alert" className="mt-4 text-tessera-warn">{loginError}</p>}
             <a href="/api/tessera/admin-login" className={`mt-6 ${primaryButton}`}>Sign in with Google <span aria-hidden="true">→</span></a>
           </section>
@@ -208,8 +227,19 @@ export function AdminPage() {
               <button type="button" onClick={signOut} className="underline underline-offset-4 hover:text-foreground">Sign out</button>
             </p>
             {signOutError && <p role="alert" className="mt-2 text-sm text-tessera-warn">{signOutError}</p>}
-            <Clicks onSignedOut={() => setSession({ kind: "out" })} />
-            <Licenses onSignedOut={() => setSession({ kind: "out" })} />
+            <div role="group" aria-label="App" className="mt-6 inline-flex rounded-full border border-tessera-panel-line p-1">
+              {ADMIN_APPS.map((a) => (
+                <button key={a.slug} type="button" aria-pressed={a.slug === app.slug} onClick={() => setApp(a)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${a.slug === app.slug ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+                  {a.name}
+                </button>
+              ))}
+            </div>
+            {/* Keyed by app so a switch starts every panel from nothing. */}
+            <AdminAppContext.Provider value={app} key={app.slug}>
+              <Clicks onSignedOut={() => setSession({ kind: "out" })} />
+              <Licenses onSignedOut={() => setSession({ kind: "out" })} />
+            </AdminAppContext.Provider>
           </>
         )}
       </div>
@@ -221,6 +251,7 @@ interface DayClicks { date: string; download: number; buy: number }
 
 /** Download and Buy Pro clicks on the site (people only; brew installs and in-app updates don't go through it). */
 function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
+  const app = useContext(AdminAppContext);
   const [days, setDays] = useState<DayClicks[] | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -229,7 +260,7 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
 
   useEffect(() => {
     let live = true;
-    adminRequest({ action: "stats" })
+    adminRequest(app, { action: "stats" })
       .then(({ status, data }) => {
         if (!live) return;
         if (status === 401) signedOut.current();
@@ -241,7 +272,7 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
       })
       .catch(() => live && setFailed(true));
     return () => { live = false; };
-  }, []);
+  }, [app]);
 
   const sum = (n: number, key: "download" | "buy") => (days ?? []).slice(0, n).reduce((t, d) => t + d[key], 0);
   const recent = (days ?? []).slice(0, 14);
@@ -254,10 +285,10 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
         <h2 id="clicks-title" className="text-lg font-medium">Site clicks</h2>
         <a href={productId ? `https://dashboard.stripe.com/products/${productId}` : "https://dashboard.stripe.com/products"}
           target="_blank" rel="noopener noreferrer" className="text-sm underline underline-offset-4 hover:text-tessera-accent">
-          Tessera Pro in Stripe<span className="sr-only"> (opens in a new tab)</span> <span aria-hidden="true">↗</span>
+          {app.product} in Stripe<span className="sr-only"> (opens in a new tab)</span> <span aria-hidden="true">↗</span>
         </a>
       </div>
-      <p className="mt-1 text-sm text-tessera-panel-muted">Download and Buy Pro clicks on this site, by UTC day. Brew installs and in-app updates aren't included.</p>
+      <p className="mt-1 text-sm text-tessera-panel-muted">Download and {app.buy} clicks on this site, by UTC day. Brew installs and in-app updates aren't included.</p>
       {failed && <p role="alert" className="mt-4 text-tessera-warn">Couldn't load the counts. Reload to try again.</p>}
       {!failed && !days && <p className="mt-4 text-tessera-panel-muted" aria-live="polite">Loading…</p>}
       {days && (
@@ -267,7 +298,7 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
               <div key={title} className="rounded-xl bg-tessera-panel-deep p-4">
                 <dt className="text-sm text-tessera-panel-muted">{title}</dt>
                 <dd className="mt-1 text-2xl font-medium tabular-nums">{sum(n, "download")} <span className="text-sm font-normal text-tessera-panel-muted">downloads</span></dd>
-                <dd className="text-sm tabular-nums text-tessera-panel-muted">{sum(n, "buy")} Buy Pro</dd>
+                <dd className="text-sm tabular-nums text-tessera-panel-muted">{sum(n, "buy")} {app.buy}</dd>
               </div>
             ))}
           </dl>
@@ -298,6 +329,7 @@ function Clicks({ onSignedOut }: { onSignedOut: () => void }) {
 }
 
 function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
+  const app = useContext(AdminAppContext);
   const [query, setQuery] = useState("");
   const [target, setTarget] = useState<string | null>(null);
   const [lookup, setLookup] = useState<Lookup>({ kind: "idle" });
@@ -309,7 +341,7 @@ function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
   const runLookup = useCallback(async (value: string): Promise<License[] | null> => {
     setLookup({ kind: "loading" });
     try {
-      const { status, data } = await adminRequest({ action: "lookup", target: value });
+      const { status, data } = await adminRequest(app, { action: "lookup", target: value });
       if (status === 401) {
         onSignedOut();
         return null;
@@ -328,7 +360,7 @@ function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
       setLookup({ kind: "error", message: "Couldn't reach the server. Please try again." });
       return null;
     }
-  }, [onSignedOut]);
+  }, [app, onSignedOut]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -351,7 +383,7 @@ function Licenses({ onSignedOut }: { onSignedOut: () => void }) {
   async function perform(p: Pending, reason: string): Promise<string | null> {
     const body: Record<string, string> = { action: p.action, target: p.license.lid };
     if (p.action === "revoke") body.reason = reason;
-    const result = await adminRequest(body).catch(() => null);
+    const result = await adminRequest(app, body).catch(() => null);
     if (!result) return "Couldn't reach the server. Nothing was changed that I know of; look the license up again to check.";
     const { status, data } = result;
     if (status === 401) {
@@ -518,6 +550,7 @@ function LicenseCard({ license, onAction }: { license: License; onAction: (a: Pe
 
 /** "Give a free license" panel: a confirm dialog, then the key (in case the email fails). */
 function FreeLicense({ onSignedOut, onShow }: { onSignedOut: () => void; onShow: (lid: string) => void }) {
+  const app = useContext(AdminAppContext);
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -535,7 +568,7 @@ function FreeLicense({ onSignedOut, onShow }: { onSignedOut: () => void; onShow:
   async function issue(): Promise<string | null> {
     const body: Record<string, string> = { action: "issue_free", email: email.trim() };
     if (note.trim()) body.note = note.trim();
-    const result = await adminRequest(body).catch(() => null);
+    const result = await adminRequest(app, body).catch(() => null);
     if (!result) return "Couldn't reach the server. Nothing was issued that I know of; look the email up before trying again.";
     const { status, data } = result;
     if (status === 401) {
@@ -555,7 +588,7 @@ function FreeLicense({ onSignedOut, onShow }: { onSignedOut: () => void; onShow:
     <>
       <form onSubmit={openConfirm} className={`mt-6 ${panel}`}>
         <h2 className="text-lg font-medium">Give a free license</h2>
-        <p className="mt-1 text-sm text-tessera-panel-muted">Signs a Tessera Pro key, emails it to them and records it as free.</p>
+        <p className="mt-1 text-sm text-tessera-panel-muted">Signs a {app.product} key, emails it to them and records it as free.</p>
         <div className="mt-3 grid gap-3">
           <div>
             <label htmlFor="free-email" className="text-sm font-medium">Email</label>
@@ -610,6 +643,7 @@ function FreeConfirmDialog({ email, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: () => Promise<string | null>;
 }) {
+  const app = useContext(AdminAppContext);
   const ref = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -635,7 +669,7 @@ function FreeConfirmDialog({ email, onCancel, onConfirm }: {
       <div className="p-6">
         <h2 id="free-confirm-title" className="text-2xl font-medium">Give a free license?</h2>
         <div className="mt-3 space-y-3 leading-relaxed text-tessera-panel-muted">
-          <p>This signs a new Tessera Pro key for <strong>{email}</strong> and <strong>emails it to them</strong>. It is recorded as free.</p>
+          <p>This signs a new {app.product} key for <strong>{email}</strong> and <strong>emails it to them</strong>. It is recorded as free.</p>
           <p>Each press of the button issues another license, so check the address first.</p>
         </div>
         {error && <p role="alert" className="mt-4 text-tessera-warn">{error}</p>}
@@ -669,14 +703,14 @@ function ReissuedKey({ info, onShow, onDismiss }: { info: Reissued; onShow: () =
   );
 }
 
-function describe(p: Pending, reason: string): ReactNode {
+function describe(p: Pending, reason: string, app: AdminApp): ReactNode {
   const id = shortId(p.license.lid);
   const who = p.license.email;
   if (p.action === "revoke") {
     return (
       <>
         <p>This adds license <span className="font-mono">{id}</span> ({who}) to the revocation list as <strong>{reason}</strong>.</p>
-        <p>Tessera stops accepting the key the next time it fetches the list (about weekly). The buyer is not emailed. You can unrevoke it later.</p>
+        <p>{app.name} stops accepting the key the next time it fetches the list (about weekly). The buyer is not emailed. You can unrevoke it later.</p>
       </>
     );
   }
@@ -691,7 +725,7 @@ function describe(p: Pending, reason: string): ReactNode {
   return (
     <>
       <p>This signs a new key for {who}, <strong>emails it to the buyer</strong>, and revokes the old key <span className="font-mono">{id}</span>.</p>
-      <p>The old key stops working once Tessera next fetches the revocation list. Doing it twice is safe: the second time returns the same replacement.</p>
+      <p>The old key stops working once {app.name} next fetches the revocation list. Doing it twice is safe: the second time returns the same replacement.</p>
     </>
   );
 }
@@ -704,6 +738,7 @@ function ConfirmDialog({ pending, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: (reason: string) => Promise<string | null>;
 }) {
+  const app = useContext(AdminAppContext);
   const ref = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState("leaked");
   const [busy, setBusy] = useState(false);
@@ -729,7 +764,7 @@ function ConfirmDialog({ pending, onCancel, onConfirm }: {
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-tessera-panel-line bg-tessera-panel p-0 text-tessera-panel-ink backdrop:bg-black/50">
       <div className="p-6">
         <h2 id="confirm-title" className="text-2xl font-medium">{TITLES[pending.action]}</h2>
-        <div className="mt-3 space-y-3 leading-relaxed text-tessera-panel-muted">{describe(pending, reason)}</div>
+        <div className="mt-3 space-y-3 leading-relaxed text-tessera-panel-muted">{describe(pending, reason, app)}</div>
 
         {pending.action === "revoke" && (
           <fieldset className="mt-4">

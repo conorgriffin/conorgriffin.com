@@ -49,13 +49,14 @@ function signPayload(payload, privateKeyBase64) {
 }
 
 /**
- * @param {{ privateKey: string | undefined, kid: string, lid: string, email: string, iat: number }} p
- * @returns {string} TSR1-<payload>.<signature>
+ * `prefix` and `product` default to Tessera's; other apps pass theirs (see apps.js).
+ * @param {{ privateKey: string | undefined, kid: string, lid: string, email: string, iat: number, prefix?: string, product?: string }} p
+ * @returns {string} <prefix><payload>.<signature>, e.g. TSR1-…
  */
-export function signLicense({ privateKey, kid, lid, email, iat }) {
+export function signLicense({ privateKey, kid, lid, email, iat, prefix = LICENSE_PREFIX, product = PRODUCT }) {
   // Key order is part of the contract: v, kid, lid, email, iat, product.
-  const { payloadB64, sigB64 } = signPayload({ v: 1, kid, lid, email, iat, product: PRODUCT }, privateKey);
-  return `${LICENSE_PREFIX}${payloadB64}.${sigB64}`;
+  const { payloadB64, sigB64 } = signPayload({ v: 1, kid, lid, email, iat, product }, privateKey);
+  return `${prefix}${payloadB64}.${sigB64}`;
 }
 
 /**
@@ -71,13 +72,14 @@ export function signRevocationList({ privateKey, kid, seq, generated, revoked })
  * Mirrors the app's verifier; used by tests and as a deploy-time sanity check.
  * @param {string} license
  * @param {Record<string, string>} publicKeys kid → raw public key (base64)
+ * @param {{ prefix?: string, product?: string }} [app] defaults to Tessera's prefix and product
  * @returns {{ ok: true, payload: any } | { ok: false, error: string }}
  */
-export function verifyLicense(license, publicKeys) {
+export function verifyLicense(license, publicKeys, { prefix = LICENSE_PREFIX, product = PRODUCT } = {}) {
   try {
     const s = String(license).replace(/\s+/g, "");
-    if (!s.startsWith(LICENSE_PREFIX)) return { ok: false, error: "malformed" };
-    const parts = s.slice(LICENSE_PREFIX.length).split(".");
+    if (!s.startsWith(prefix)) return { ok: false, error: "malformed" };
+    const parts = s.slice(prefix.length).split(".");
     if (parts.length !== 2) return { ok: false, error: "malformed" };
     const bytes = b64urlDecode(parts[0]);
     const sig = b64urlDecode(parts[1]);
@@ -86,7 +88,7 @@ export function verifyLicense(license, publicKeys) {
     if (!raw) return { ok: false, error: "unknownKey" };
     if (!crypto.verify(null, bytes, publicKeyFromRaw(raw), sig)) return { ok: false, error: "badSignature" };
     if (payload.v !== 1) return { ok: false, error: "unsupportedVersion" };
-    if (payload.product !== PRODUCT) return { ok: false, error: "wrongProduct" };
+    if (payload.product !== product) return { ok: false, error: "wrongProduct" };
     return { ok: true, payload };
   } catch {
     return { ok: false, error: "malformed" };

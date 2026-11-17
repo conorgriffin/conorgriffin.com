@@ -123,3 +123,56 @@ export function webhookRequest(event, headerOverride) {
 
 let eventCounter = 0;
 export const event = (type, object, id = `evt_${++eventCounter}`) => ({ id, type, data: { object } });
+
+// ------------------------------------------------------------------ second app: Audio Switchboard
+
+import { APPS } from "../apps.js";
+
+export const swbVectors = JSON.parse(readFileSync(new URL("./vectors-switchboard.json", import.meta.url), "utf8"));
+export const SWB_PRODUCT_ID = "prod_switchboard";
+export const SWB_WEBHOOK_SECRET = "whsec_switchboard_test";
+
+/** Switchboard's settings under its own variable names (the shared ones, like CRON_SECRET, as in baseEnv). */
+export const swbEnv = {
+  SWITCHBOARD_STRIPE_WEBHOOK_SECRET: SWB_WEBHOOK_SECRET,
+  SWITCHBOARD_STRIPE_PRODUCT_ID: SWB_PRODUCT_ID,
+  SWITCHBOARD_LICENSE_KID: "T1",
+  SWITCHBOARD_LICENSE_PRIVATE_KEY: swbVectors.keys.license.privateKeyPkcs8Base64,
+  SWITCHBOARD_REVOCATION_KID: "TR1",
+  SWITCHBOARD_REVOCATION_PRIVATE_KEY: swbVectors.keys.revocation.privateKeyPkcs8Base64,
+  SUPPORT_EMAIL: "support@example.com",
+  CRON_SECRET: "cron-secret",
+  SWITCHBOARD_PAYMENT_LINK_URL: "https://buy.stripe.com/test_swb",
+  SWITCHBOARD_DOWNLOAD_URL: "https://example.com/AudioSwitchboard.dmg",
+};
+
+/** A paid Checkout Session for Audio Switchboard's product. */
+export const makeSwbSession = (over = {}) =>
+  makeSession({ id: "cs_test_swb12345", payment_intent: "pi_swb1", line_items: { data: [{ price: { product: SWB_PRODUCT_ID } }] }, ...over });
+
+/**
+ * Two contexts over ONE fake Redis database, as in production: Tessera's keys under "tessera:", Switchboard's under
+ * "switchboard:". Each has its own settings and mailer; they share the Stripe account (and its fake). `db.strings`
+ * holds the real, prefixed keys.
+ */
+export function makeBothCtx() {
+  const tessera = makeCtx({ app: APPS.tessera, store: createMemoryStore({ namespace: APPS.tessera.redisNamespace }) });
+  const stripe = tessera.stripe;
+  const db = tessera.store;
+  const switchboard = makeCtx({
+    app: APPS.switchboard, env: { ...swbEnv }, stripe, store: createMemoryStore({ namespace: APPS.switchboard.redisNamespace, shared: db }),
+  });
+  switchboard.adminStore = createMemoryStore({ namespace: APPS.tessera.redisNamespace, shared: db });
+  tessera.adminStore = tessera.store;
+  return { tessera, switchboard, db, stripe };
+}
+
+/** A signed webhook Request for the Switchboard endpoint. */
+export function swbWebhookRequest(ev, headerOverride) {
+  const body = JSON.stringify(ev);
+  return new Request("https://www.conorgriffin.com/api/switchboard/stripe-webhook", {
+    method: "POST",
+    headers: { "stripe-signature": headerOverride ?? stripeHeader(body, { secret: SWB_WEBHOOK_SECRET }) },
+    body,
+  });
+}

@@ -1,5 +1,7 @@
 # Tessera direct sale: website and licensing server
 
+> **Two apps, one server.** The licensing server is multi-app: Tessera and Audio Switchboard are served by the same functions in `api/[app]/` (`/api/tessera/…` and `/api/switchboard/…`), driven by the registry in `api/_lib/apps.js`. Everything below is Tessera's setup and is unchanged; where it says `/api/tessera/x`, the same route exists for every app. Audio Switchboard's setup and environment variables are in [`switchboard-direct-sale.md`](switchboard-direct-sale.md).
+
 How Tessera Pro is sold from conorgriffin.com outside the Mac App Store, and what to set up. The formats (license, revocation list) are defined in the Tessera repo, `docs/specs/direct-sale.md`. This repo only implements the server side and the pages.
 
 ## What was added
@@ -17,12 +19,12 @@ How Tessera Pro is sold from conorgriffin.com outside the Mac App Store, and wha
 | `GET /api/tessera/license?session_id=cs_…` | Used by the thanks page. Issues the license if the webhook hasn't yet. Only for purchases up to 7 days old (counted from the Checkout Session's creation, not from when the key was issued), and never for a session whose license has been reissued (404 with the find-my-license pointer) |
 | `POST /api/tessera/resend` | Find my license. Always answers `{"ok":true}`; rate limited silently |
 | `GET /api/tessera/revocations` | Signed revocation list the app polls weekly |
-| `GET /api/tessera/reconcile` | Daily Vercel Cron safety net (last 3 days of sessions, refunds, disputes; retries unsent emails) |
+| `GET /api/tessera/reconcile` | Reconciles Tessera only: last 3 days of sessions, refunds, disputes; retries unsent emails. The daily Vercel Cron calls `GET /api/all/reconcile` instead, which does this for every configured app (same `CRON_SECRET` check) |
 | `POST /api/tessera/admin` | Admin only: look up, revoke, un-revoke or replace a license. Accepts the `TESSERA_ADMIN_SECRET` bearer token (CLI) or the signed-in Google session cookie (admin page). See "Admin: revoke or replace a leaked key". Answers 404 to everything while neither is configured, and to any request not addressed to the configured admin host (see `TESSERA_ADMIN_BASE_URL`). Failed attempts are rate limited per IP |
 | `/tessera/admin` | Admin page (not linked from anywhere, `noindex`): "Sign in with Google", then search, revoke, un-revoke and reissue. See "Admin page (Sign in with Google)" |
 | `GET /api/tessera/admin-login`, `GET /api/tessera/admin-callback`, `GET /api/tessera/admin-session`, `POST /api/tessera/admin-logout` | The Google sign-in flow behind the admin page. All four answer 404 until the Google admin variables below are set, and on any host other than the configured admin host |
 
-Code lives in `api/_lib/` (shared, not routes) and `api/tessera/` (thin route files). No npm dependencies: Node 22 `crypto` and `fetch` only.
+Code lives in `api/_lib/` (shared, not routes) and `api/[app]/` (thin route files, one function per route serving every app). No npm dependencies: Node 22 `crypto` and `fetch` only.
 
 ## Environment variables
 
@@ -64,7 +66,7 @@ Private keys never go in a repo or a chat. Generate them with `tools/licensing/k
    5. Create the secret key (or a restricted key, see above).
 5. **Vercel env vars.** Add every variable from the table: Production only, Sensitive. Then redeploy.
 6. **Download.** Upload the DMG somewhere with a stable HTTPS URL and set `TESSERA_DOWNLOAD_URL`. Update it on each release.
-7. **Cron.** Already in `vercel.json` (daily, 04:17 UTC). Vercel Cron runs on Production deployments only.
+7. **Cron.** Already in `vercel.json` (daily, 04:17 UTC, `/api/all/reconcile`). Vercel Cron runs on Production deployments only.
 8. **Test mode first.** Do steps 4 to 5 once with Stripe test keys on a throwaway deployment (a separate Vercel project, or temporarily), buy with card 4242 4242 4242 4242, and check: thanks page shows a key, email arrives, `https://…/api/tessera/revocations` returns `{"payload","sig"}`, a refund in the Stripe dashboard adds your license id to the list. Then switch to live keys.
 9. **Release the app** with the real public keys, `SUFeedURL` (`https://conorgriffin.com/tessera/appcast.xml`) and the release script from the Tessera repo.
 
@@ -157,9 +159,11 @@ Fixes from the adversarial security review of the license admin:
 
 ## Redis keys
 
-`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `reissue:<old lid>` (the replacement's id; claimed atomically so a reissue happens once), `ignored:<cs_id>` (4-day expiry, sessions for other products), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry), `rl:adminfail:<hash of IP>` (failed admin attempts, 1-hour expiry), `adminsess:<sid>` (admin page session, 8-hour expiry), `clicks:download:<YYYY-MM-DD>` and `clicks:buy:<YYYY-MM-DD>` (site clicks per UTC day, counted by `/api/tessera/go` for non-bot GETs, 400-day expiry; shown on the admin page). Licence records also carry `purchasedAt` (the Checkout Session's created time), and `paymentRevokedAt` / `paymentRevokeReason` once the payment was refunded or disputed.
+`lic:<lid>`, `session:<cs_id>`, `pi:<pi_id>`, `email:<sha256(lowercased email)>` (set), `revoked` (set), `revocations:seq`, `evt:<event id>` (30-day expiry), `unsent` (set of licenses whose email failed), `reissue:<old lid>` (the replacement's id; claimed atomically so a reissue happens once), `ignored:<cs_id>` (4-day expiry, sessions for other products or other apps), `rl:email:<hash>` and `rl:ip:<hash>` (1-hour expiry), `rl:adminfail:<hash of IP>` (failed admin attempts, 1-hour expiry), `adminsess:<sid>` (admin page session, 8-hour expiry), `clicks:download:<YYYY-MM-DD>` and `clicks:buy:<YYYY-MM-DD>` (site clicks per UTC day, counted by `/api/tessera/go` for non-bot GETs, 400-day expiry; shown on the admin page). Licence records also carry `purchasedAt` (the Checkout Session's created time), and `paymentRevokedAt` / `paymentRevokeReason` once the payment was refunded or disputed.
 
-To look at a license by hand, open the Upstash data browser and `GET lic:<lid>`.
+Tessera's keys are stored with the prefix `tessera:` (so the key above is `tessera:lic:<lid>` in Redis); Audio Switchboard's are `switchboard:…`. The prefix is added by the store, not by the code that names the keys.
+
+To look at a license by hand, open the Upstash data browser and `GET tessera:lic:<lid>`.
 
 ## Tests
 
@@ -167,7 +171,7 @@ To look at a license by hand, open the Upstash data browser and `GET lic:<lid>`.
 npm run test:api
 ```
 
-This runs `node --test "api/**/*.test.js"` (Node 22 does not recurse into a bare directory, so a plain `node --test api/` finds nothing). The tests use the shared vectors in `api/_lib/__tests__/vectors.json` (test keys only) and fake Stripe, Redis and email.
+This runs `node --test "api/**/*.test.js"` (Tessera's tests, the Audio Switchboard tests in `switchboard.test.js` and the multi-app layout guards in `multiapp.test.js`) (Node 22 does not recurse into a bare directory, so a plain `node --test api/` finds nothing). The tests use the shared vectors in `api/_lib/__tests__/vectors.json` (test keys only) and fake Stripe, Redis and email.
 
 ## Not verified against the real services
 

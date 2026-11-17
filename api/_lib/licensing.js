@@ -1,12 +1,19 @@
 // Licence issuing, revocation and the event rules. Everything takes a context
 // `ctx = { env, store, stripe, mailer, now(), log }` so tests can fake each part.
 //
+// The app (apps.js) comes from `ctx.app` (Tessera when absent). Everything app-specific (license prefix and product,
+// signing keys, the Stripe product, email branding) is read from it; the Redis keys below are namespaced by the store
+// itself (createRedisStore's `namespace`), so this code never sees the prefix.
+//
 // Redis keys: lic:<lid>, session:<cs_id> (Stripe purchases only; free licences have none), pi:<pi_id>, email:<sha256(email)>, revoked (set),
 // revocations:seq, evt:<event id>, unsent (set of lids whose email failed), ignored:<cs_id>.
 import { emailHash, randomLicenseId, signLicense, signRevocationList } from "./crypto.js";
+import { DEFAULT_APP, isConfigured } from "./apps.js";
 import { activationUrl, freeLicenseEmail, licenseEmail, reissuedEmail, resendEmail, revokedEmail } from "./email.js";
 
 const DAY = 86400;
+/** The app this context serves. @param {any} ctx @returns {import("./apps.js").AppConfig} */
+export const appOf = (ctx) => ctx.app ?? DEFAULT_APP;
 export const SESSION_MAX_AGE_SECONDS = 7 * DAY;
 
 const licKey = (/** @type {string} */ lid) => `lic:${lid}`;
@@ -59,8 +66,9 @@ async function patchLicense(/** @type {any} */ ctx, /** @type {string} */ lid, /
 
 const nowSeconds = (/** @type {any} */ ctx) => Math.floor(ctx.now() / 1000);
 
-/** True when the (expanded) session contains the Tessera product. */
-export function sessionHasProduct(/** @type {any} */ session, /** @type {string} */ productId) {
+/** True when the (expanded) session contains the app's Stripe product. Never true without a configured product id. */
+export function sessionHasProduct(/** @type {any} */ session, /** @type {string | undefined} */ productId) {
+  if (!productId) return false;
   const items = session?.line_items?.data ?? [];
   return items.some((/** @type {any} */ li) => {
     const p = li?.price?.product;
@@ -78,9 +86,13 @@ const idOf = (/** @type {any} */ v) => (typeof v === "string" ? v : v?.id ?? nul
  */
 function mintLicense(ctx, { email, sessionId, paymentIntent, reissuedFrom, purchasedAt, free }) {
   const { env } = ctx;
+  const app = appOf(ctx);
   const lid = randomLicenseId();
   const issuedAt = nowSeconds(ctx);
-  const license = signLicense({ privateKey: env.TESSERA_LICENSE_PRIVATE_KEY, kid: env.TESSERA_LICENSE_KID || "L1", lid, email, iat: issuedAt });
+  const license = signLicense({
+    privateKey: env[app.env.licensePrivateKey], kid: env[app.env.licenseKid] || "L1", lid, email, iat: issuedAt,
+    prefix: app.licensePrefix, product: app.product,
+  });
   /** @type {LicenseRecord} */
   const rec = {
     lid, email, license, sessionId: typeof sessionId === "function" ? sessionId(lid) : sessionId, paymentIntent,
@@ -119,7 +131,7 @@ export async function issueLicense(ctx, sessionId, opts = {}) {
   if (!session) return { ok: false, reason: "not_found" };
   if (opts.maxAgeSeconds && nowSeconds(ctx) - Number(session.created) > opts.maxAgeSeconds) return { ok: false, reason: "too_old" };
   if (session.status !== "complete" || session.payment_status !== "paid") return { ok: false, reason: "unpaid" };
-  if (!sessionHasProduct(session, env.TESSERA_STRIPE_PRODUCT_ID)) {
+  if (!sessionHasProduct(session, env[appOf(ctx).env.productId])) {
     await store.set(`ignored:${sessionId}`, "1", { ex: 4 * DAY });
     return { ok: false, reason: "wrong_product" };
   }
@@ -177,9 +189,10 @@ export async function sendLicenseEmail(/** @type {any} */ ctx, /** @type {string
   const rec = await getLicense(ctx, lid);
   if (!rec || rec.emailedAt) return false;
   try {
+    const app = appOf(ctx);
     const make = rec.reissuedFrom ? reissuedEmail : rec.free ? freeLicenseEmail : licenseEmail;
-    const message = make(rec, ctx.env.SUPPORT_EMAIL);
-    await ctx.mailer.send({ to: rec.email, ...message, idempotencyKey: `tessera-license-${lid}` });
+    const message = make(rec, ctx.env.SUPPORT_EMAIL, app);
+    await ctx.mailer.send({ to: rec.email, ...message, idempotencyKey: `${app.slug}-license-${lid}` });
   } catch (e) {
     ctx.log.warn("licence email failed", mailFail(e));
     return false;
@@ -255,7 +268,8 @@ async function revokeOne(ctx, lid, reason, primary) {
   // The customer hears about a refund or dispute once, however many chain members or earlier admin reasons there are.
   if (primary && payment && !before) {
     try {
-      await ctx.mailer.send({ to: rec.email, ...revokedEmail(rec, ctx.env.SUPPORT_EMAIL), idempotencyKey: `tessera-revoked-${lid}` });
+      const app = appOf(ctx);
+      await ctx.mailer.send({ to: rec.email, ...revokedEmail(rec, ctx.env.SUPPORT_EMAIL, app), idempotencyKey: `${app.slug}-revoked-${lid}` });
     } catch (e) {
       ctx.log.warn("revocation email failed", mailFail(e));
     }
@@ -469,13 +483,14 @@ export async function findLicenses(ctx, target) {
   return records.sort((a, b) => a.issuedAt - b.issuedAt);
 }
 
-/** The signed list served at /api/tessera/revocations. */
+/** The signed list served at /api/<app>/revocations, from this app's revoked set and signing key. */
 export async function buildRevocationList(/** @type {any} */ ctx) {
+  const app = appOf(ctx);
   const seq = Number((await ctx.store.get("revocations:seq")) ?? 0); // read first: a newer list never carries an older seq
   const revoked = (await ctx.store.smembers("revoked")).slice().sort();
   return signRevocationList({
-    privateKey: ctx.env.TESSERA_REVOCATION_PRIVATE_KEY,
-    kid: ctx.env.TESSERA_REVOCATION_KID || "R1",
+    privateKey: ctx.env[app.env.revocationPrivateKey],
+    kid: ctx.env[app.env.revocationKid] || "R1",
     seq: seq + 1, // starts at 1 and still strictly increases with every change
     generated: nowSeconds(ctx),
     revoked,
@@ -580,7 +595,7 @@ export async function resendLicenses(/** @type {any} */ ctx, /** @type {string} 
   if (records.length === 0) return "none";
   records.sort((a, b) => a.issuedAt - b.issuedAt);
   try {
-    await ctx.mailer.send({ to: records[0].email, ...resendEmail(records, ctx.env.SUPPORT_EMAIL) });
+    await ctx.mailer.send({ to: records[0].email, ...resendEmail(records, ctx.env.SUPPORT_EMAIL, appOf(ctx)) });
   } catch (e) {
     ctx.log.warn("resend email failed", mailFail(e));
     return "none";
@@ -637,3 +652,32 @@ export async function reconcile(/** @type {any} */ ctx) {
 }
 
 export { activationUrl };
+
+/**
+ * Reconciles every registered app that is configured, one after the other, each with its own context (store
+ * namespace, keys). A failing app doesn't stop the others. An app that isn't configured yet (not launched) is skipped.
+ * @param {(slug: string) => any} getCtxFor
+ * @param {import("./apps.js").AppConfig[]} apps
+ * @param {{ error: (msg: string, f?: object) => void }} log
+ */
+export async function reconcileAll(getCtxFor, apps, log) {
+  /** @type {Record<string, any>} */
+  const results = {};
+  let errors = 0;
+  for (const app of apps) {
+    try {
+      const ctx = getCtxFor(app.slug);
+      if (app.slug !== DEFAULT_APP.slug && !isConfigured(app, ctx.env)) {
+        results[app.slug] = { skipped: "not_configured" };
+        continue;
+      }
+      results[app.slug] = await reconcile(ctx);
+      errors += results[app.slug].errors;
+    } catch (e) {
+      log.error("reconcile failed", { app: app.slug, error: errName(e) });
+      results[app.slug] = { errors: 1, failed: true };
+      errors += 1;
+    }
+  }
+  return { errors, apps: results };
+}

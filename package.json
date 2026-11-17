@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && vite build --ssr src/tessera/ssr.tsx --outDir dist-ssr && node scripts/prerender.mjs",
+    "build": "tsc --noEmit && vite build && vite build --ssr src/ssr.tsx --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
     "test:api": "node --test \"api/**/*.test.js\"",
-    "tessera:admin": "node scripts/tessera-admin.mjs"
+    "tessera:admin": "node scripts/tessera-admin.mjs",
+    "switchboard:admin": "node scripts/tessera-admin.mjs --app switchboard"
   },
   "dependencies": {
     "react": "^19.2.0",

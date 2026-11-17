@@ -13,7 +13,7 @@
 //   mget(keys): Promise<(string | null)[]>
 
 /**
- * `namespace` is prepended to every key (e.g. "tessera:"), so one database can serve several products.
+ * `namespace` is prepended to every key (e.g. "tessera:" or "switchboard:", from apps.js), so one database can serve several products.
  * @param {{ url: string | undefined, token: string | undefined, namespace?: string, fetch?: typeof fetch }} cfg
  */
 export function createRedisStore({ url, token, namespace = "", fetch: fetchImpl = fetch }) {
@@ -78,54 +78,60 @@ export function createRedisStore({ url, token, namespace = "", fetch: fetchImpl 
   };
 }
 
-/** In-memory fake with the same behaviour, for tests. `ttls` records expiries that were requested. */
-export function createMemoryStore() {
-  /** @type {Map<string, string>} */ const strings = new Map();
-  /** @type {Map<string, Set<string>>} */ const sets = new Map();
-  /** @type {Map<string, number>} */ const ttls = new Map();
+/**
+ * In-memory fake with the same behaviour, for tests. `ttls` records expiries that were requested.
+ * `namespace` is prepended to every key like createRedisStore's, so the maps hold the real (prefixed) keys; pass
+ * `shared` (another memory store) to get a second app's view of the same database.
+ * @param {{ namespace?: string, shared?: { strings: Map<string, string>, sets: Map<string, Set<string>>, ttls: Map<string, number> } }} [opts]
+ */
+export function createMemoryStore({ namespace = "", shared } = {}) {
+  const strings = shared?.strings ?? new Map();
+  const sets = shared?.sets ?? new Map();
+  const ttls = shared?.ttls ?? new Map();
+  const k = (/** @type {string} */ key) => namespace + key;
   return {
     strings,
     sets,
     ttls,
     async get(key) {
-      return strings.has(key) ? /** @type {string} */ (strings.get(key)) : null;
+      return strings.has(k(key)) ? /** @type {string} */ (strings.get(k(key))) : null;
     },
     async set(key, value, { ex, nx } = {}) {
-      if (nx && strings.has(key)) return false;
-      strings.set(key, String(value));
-      if (ex) ttls.set(key, ex);
+      if (nx && strings.has(k(key))) return false;
+      strings.set(k(key), String(value));
+      if (ex) ttls.set(k(key), ex);
       return true;
     },
     async del(key) {
-      strings.delete(key);
-      sets.delete(key);
+      strings.delete(k(key));
+      sets.delete(k(key));
     },
     async incr(key) {
-      const n = Number(strings.get(key) ?? 0) + 1;
-      strings.set(key, String(n));
+      const n = Number(strings.get(k(key)) ?? 0) + 1;
+      strings.set(k(key), String(n));
       return n;
     },
     async incrWithExpiry(key, seconds) {
-      const n = Number(strings.get(key) ?? 0) + 1;
-      strings.set(key, String(n));
-      if (!ttls.has(key)) ttls.set(key, seconds);
+      const n = Number(strings.get(k(key)) ?? 0) + 1;
+      strings.set(k(key), String(n));
+      if (!ttls.has(k(key))) ttls.set(k(key), seconds);
       return n;
     },
     async sadd(key, member) {
-      const s = sets.get(key) ?? new Set();
+      const s = sets.get(k(key)) ?? new Set();
       const had = s.has(member);
       s.add(member);
-      sets.set(key, s);
+      sets.set(k(key), s);
       return had ? 0 : 1;
     },
     async srem(key, member) {
-      return sets.get(key)?.delete(member) ? 1 : 0;
+      return sets.get(k(key))?.delete(member) ? 1 : 0;
     },
     async smembers(key) {
-      return [...(sets.get(key) ?? [])];
+      return [...(sets.get(k(key)) ?? [])];
     },
     async mget(/** @type {string[]} */ keys) {
-      return keys.map((key) => strings.get(key) ?? null);
+      return keys.map((key) => strings.get(k(key)) ?? null);
     },
   };
 }
