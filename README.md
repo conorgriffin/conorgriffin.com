@@ -1,6 +1,6 @@
 # conorgriffin.com
 
-Personal site. Vite + React + Tailwind v4. Static, apart from the small Tessera licensing server in `api/`.
+Personal site. Vite + React + Tailwind v4. Static, apart from the small licensing server in `api/` (Tessera and Audio Switchboard).
 
 ```
 npm install
@@ -21,3 +21,5 @@ The Tessera app pages live in `src/tessera/` and are served at `/tessera`, `/tes
 Hosted on Vercel, which builds `master` with `npm run build` and serves `dist/`; every PR gets a preview deploy.
 
 The direct-download sale of Tessera Pro adds `/tessera/thanks`, `/tessera/license` and `/tessera/terms`, the redirects `/tessera/buy` and `/tessera/download`, the Sparkle feed `/tessera/appcast.xml`, and serverless functions in `api/` (Stripe webhook, license delivery, revocation list). There is also a private admin page at `/tessera/admin` (not linked anywhere, `noindex`) for looking up, revoking and reissuing licenses behind "Sign in with Google". Setup, environment variables and behaviour are in [`docs/tessera-direct-sale.md`](docs/tessera-direct-sale.md). `npm run test:api` runs the server tests.
+
+Audio Switchboard is sold the same way: pages in `src/switchboard/` (one HTML entry per page under `switchboard/`), served at `/switchboard`, `/switchboard/privacy`, `/switchboard/support` and so on. One set of serverless functions in `api/[app]/` serves every app (Vercel Hobby allows 12 functions), and `api/_lib/apps.js` is the registry of everything app-specific. Setup, environment variables and the Stripe and DNS steps are in [`docs/switchboard-direct-sale.md`](docs/switchboard-direct-sale.md).
