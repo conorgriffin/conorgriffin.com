@@ -13,7 +13,7 @@ export const now: NowItem[] = [
   {
     title: "Orchestrate for agents",
     blurb:
-      "Helping my team open Workday Orchestrate up to AI agents, so integrations are exposed as tools that MCP servers and agents can call.",
+      "Orchestrate is being opened up to AI agents, with integrations exposed as tools that MCP servers can call. The engineers own that implementation; my part is leading the team and the runtime it all executes on.",
   },
   {
     title: "Agentic ways of working",
