@@ -77,8 +77,11 @@ export function App() {
             Conor Griffin<span className="text-primary">.</span>
           </h1>
           <p className="mt-8 max-w-2xl text-xl leading-relaxed text-muted-foreground md:text-2xl animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            Engineer and engineering leader at Workday. I work on integration tooling and how AI agents use it,
-            and I make small, <em className="font-display text-foreground">thoughtful</em> apps for Apple platforms in my spare time.
+            Hands-on engineering leader at Workday. I lead the team that owns the Orchestrate runtime, the engine
+            that runs customer integrations and some of the most critical workloads for some of the world's biggest
+            companies, and I'm still in the code: opening Orchestrate up to AI agents and bringing agentic practices
+            to how we build. In my spare time I make small, <em className="font-display text-foreground">thoughtful</em> apps
+            for Apple platforms.
           </p>
           <div className="mt-10 animate-in fade-in duration-1000"><Socials /></div>
         </section>
