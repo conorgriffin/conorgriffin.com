@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 
 /**
- * Tessera Pro's price in the visitor's currency (e.g. "€9.99"), fetched from Stripe via /api/tessera/price.
+ * The app's price in the visitor's currency (e.g. "€9.99"), fetched from Stripe via /api/<app>/price (Tessera Pro by default).
  * Undefined until it loads, while sales are closed, or if the lookup fails, so callers render without it.
  */
-export function useProPrice(enabled: boolean): string | undefined {
+export function useProPrice(enabled: boolean, app: "tessera" | "switchboard" = "tessera"): string | undefined {
   const [price, setPrice] = useState<string>();
   useEffect(() => {
     if (!enabled) return;
     let live = true;
-    fetch("/api/tessera/price")
+    fetch(`/api/${app}/price`)
       .then((r) => (r.ok ? r.json() : undefined))
       .then((p: { currency?: string; amount?: number } | undefined) => {
         if (!live || !p?.currency || typeof p.amount !== "number") return;
@@ -20,6 +20,6 @@ export function useProPrice(enabled: boolean): string | undefined {
       })
       .catch(() => {});
     return () => { live = false; };
-  }, [enabled]);
+  }, [enabled, app]);
   return price;
 }
