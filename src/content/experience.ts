@@ -31,7 +31,7 @@ export const experience: ExperienceCompany[] = [
         start: "May 2026",
         end: "Present",
         summary:
-          "I own the Orchestrate runtime: the engine that runs customer integrations and executes some of the most critical workloads for some of the world's biggest companies. Alongside that, driving agentic SDLC practices across the team, and using LLMs, coding assistants and agentic tooling myself to improve our observability and eliminate toil.",
+          "I own the Orchestrate runtime: the engine that runs customer integrations and executes some of the most critical workloads for some of the world's biggest companies. I stay involved in the code and the technical decisions and investigations, drive agentic SDLC practices across the team, and use LLMs, coding assistants and agentic tooling myself to improve our observability and eliminate toil.",
       },
       { role: "Software Engineering Manager", start: "Jun 2022", end: "May 2026" },
       { role: "Principal Software Engineer", start: "May 2021", end: "Jun 2022" },
