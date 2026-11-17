@@ -500,3 +500,30 @@ test("admin: a Google session only works for an app whose own allowlist has the 
   switchboard.env.SWITCHBOARD_ADMIN_EMAILS = "ME@example.com";
   assert.equal((await post(switchboard, "switchboard")).status, 200, "on both lists");
 });
+
+// ------------------------------------------------------------------ sales spike alert
+
+test("a sales spike emails the owner once at the threshold, per app, and never fails a sale", async () => {
+  const { switchboard, tessera, stripe } = makeBothCtx();
+  const mine = (ctx) => ctx.mailer.sent.filter((m) => /sales in one hour/.test(m.subject));
+  for (let i = 0; i < 6; i++) {
+    const s = makeSwbSession({ id: `cs_spike_${i}`, payment_intent: `pi_spike_${i}`, customer_details: { email: `b${i}@example.com` } });
+    stripe.state.sessions.set(s.id, s);
+    assert.equal((await issueLicense(switchboard, s.id)).ok, true);
+  }
+  const alerts = mine(switchboard);
+  assert.equal(alerts.length, 1, "one alert at the 5th sale, none at the 6th");
+  assert.equal(alerts[0].to, "support@example.com");
+  assert.match(alerts[0].subject, /^Audio Switchboard: 5 sales in one hour$/);
+  assert.match(alerts[0].text, /refund them in Stripe/);
+  assert.equal(mine(tessera).length, 0, "Tessera's count is separate");
+
+  // A failing alert mail must not fail the sale.
+  const { switchboard: sb2, stripe: st2 } = makeBothCtx();
+  sb2.env.SALES_ALERT_PER_HOUR = "1";
+  const realSend = sb2.mailer.send.bind(sb2.mailer);
+  sb2.mailer.send = async (m) => { if (/sales in one hour/.test(m.subject)) throw new Error("boom"); return realSend(m); };
+  const s = makeSwbSession({ id: "cs_spike_x" });
+  st2.state.sessions.set(s.id, s);
+  assert.equal((await issueLicense(sb2, s.id)).ok, true);
+});
