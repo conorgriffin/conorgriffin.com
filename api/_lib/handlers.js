@@ -122,9 +122,20 @@ export async function revocations(/** @type {(slug: string) => any} */ getCtx, /
       headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=86400" },
     });
   } catch (e) {
-    ctx.log.error("revocation list failed", { error: errName(e) });
-    return json({ error: "try_again" }, 500);
+    const reason = revocationFailure(e);
+    ctx.log.error("revocation list failed", { error: errName(e), reason });
+    // The reason names which setting is wrong (never a value), so a misconfiguration can be seen from outside.
+    return json({ error: "try_again", reason }, 500);
   }
+}
+
+/** A coarse, value-free cause for a failed revocation list. @param {any} e */
+function revocationFailure(e) {
+  const msg = String(e?.message ?? "");
+  if (msg === "signing key is not configured") return "signing_key_missing";
+  if (msg === "signing key is not Ed25519" || e?.code?.startsWith?.("ERR_OSSL") || /DECODER|asn1|der/i.test(msg)) return "signing_key_invalid";
+  if (/^redis |KV_REST_API/.test(msg)) return "store_error";
+  return "other";
 }
 
 const ALL_RECONCILE_PATH = /^\/api\/all\/reconcile\/?$/;

@@ -527,3 +527,20 @@ test("a sales spike emails the owner once at the threshold, per app, and never f
   st2.state.sessions.set(s.id, s);
   assert.equal((await issueLicense(sb2, s.id)).ok, true);
 });
+
+test("a failing revocation list says which setting is wrong, never its value", async () => {
+  const req = new Request("https://www.conorgriffin.com/api/switchboard/revocations");
+  const cases = [
+    [undefined, "signing_key_missing"],
+    [swbVectors.keys.revocation.publicKeyBase64, "signing_key_invalid"], // a public key pasted by mistake
+    ["private key: MC4CAQAwBQYDK2VwBCIEIA==", "signing_key_invalid"],
+  ];
+  for (const [value, reason] of cases) {
+    const { switchboard } = makeBothCtx();
+    switchboard.env.SWITCHBOARD_REVOCATION_PRIVATE_KEY = value;
+    switchboard.log = { error() {}, warn() {}, info() {} };
+    const res = await revocations(() => switchboard, req);
+    assert.equal(res.status, 500);
+    assert.deepEqual(await res.json(), { error: "try_again", reason });
+  }
+});
