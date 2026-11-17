@@ -24,14 +24,14 @@ export const experience: ExperienceCompany[] = [
     end: "Present",
     tenure: "9 yrs",
     summary:
-      "Several years on Workday's classic integration platforms, the ones that run critical business operations for most of the Fortune 500. Recently moved to Workday Orchestrate, the next-generation integration platform built to innovate quickly, adopt new technologies and adapt to customers at pace, where I own the runtime that executes customer integrations and stay hands-on with enabling Orchestrate for AI agents and MCP.",
+      "Several years on Workday's classic integration platforms, the ones that run critical business operations for most of the Fortune 500. Recently moved to Workday Orchestrate, the next-generation integration platform built to innovate quickly, adopt new technologies and adapt to customers at pace, where I lead the team that owns the runtime executing customer integrations.",
     roles: [
       {
         role: "Sr Software Engineering Manager",
         start: "May 2026",
         end: "Present",
         summary:
-          "I own the Orchestrate runtime: the engine that runs customer integrations and executes some of the most critical workloads for some of the world's biggest companies. Alongside that, enabling Orchestrate for agents (tools for MCP servers) and driving agentic SDLC practices across the team.",
+          "I own the Orchestrate runtime: the engine that runs customer integrations and executes some of the most critical workloads for some of the world's biggest companies. Alongside that, driving agentic SDLC practices across the team, and using LLMs, coding assistants and agentic tooling myself to improve our observability and eliminate toil.",
       },
       { role: "Software Engineering Manager", start: "Jun 2022", end: "May 2026" },
       { role: "Principal Software Engineer", start: "May 2021", end: "Jun 2022" },

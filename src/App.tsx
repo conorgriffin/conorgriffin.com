@@ -77,11 +77,11 @@ export function App() {
             Conor Griffin<span className="text-primary">.</span>
           </h1>
           <p className="mt-8 max-w-2xl text-xl leading-relaxed text-muted-foreground md:text-2xl animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            Hands-on engineering leader at Workday. I lead the team that owns the Orchestrate runtime, the engine
-            that runs customer integrations and some of the most critical workloads for some of the world's biggest
-            companies, and I'm still in the code: opening Orchestrate up to AI agents and bringing agentic practices
-            to how we build. In my spare time I make small, <em className="font-display text-foreground">thoughtful</em> apps
-            for Apple platforms.
+            Engineering leader at Workday. I lead the team that owns the Orchestrate runtime, the engine that runs
+            customer integrations and some of the most critical workloads for some of the world's biggest companies.
+            I keep the job technical: driving agentic software-development practices, and using LLMs, coding
+            assistants and agentic tooling myself to sharpen our observability and cut toil. In my spare time I make
+            small, <em className="font-display text-foreground">thoughtful</em> apps for Apple platforms.
           </p>
           <div className="mt-10 animate-in fade-in duration-1000"><Socials /></div>
         </section>
@@ -93,8 +93,9 @@ export function App() {
             Mastercard helped build the platform behind the worldwide launch of Apple Pay and the company's first
             microservice platform. At Workday I've gone from engineer to principal engineer to leading teams, first
             on the classic integration platforms that run critical operations for most of the Fortune 500 and now on
-            Workday Orchestrate, the next generation. I've stayed hands-on the whole way: these days that means
-            enabling Orchestrate for AI agents and MCP, and using agentic tooling to make our own engineering faster.
+            Workday Orchestrate, the next generation. I've stayed close to the technology the whole way: these
+            days that means bringing agentic software-development practices to the team, and using LLMs, coding
+            assistants and agentic tooling myself to improve our observability and eliminate toil.
             I like the mix of deep technical work and helping a team do its best work, and I'd happily lean either
             way. In my spare time I ship small, thoughtful indie apps for Apple platforms, the kind of tools I want
             to use myself.

@@ -2,7 +2,7 @@
 export const skills = [
   "Integration platforms",
   "Distributed systems",
-  "AI agents & MCP",
+  "LLMs & agentic tooling",
   "Agentic SDLC",
   "Observability",
   "Java",
