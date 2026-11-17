@@ -1,0 +1,63 @@
+{
+  "_note": "TEST KEYS ONLY. Deterministic seeds; never use in production. Same test keys as Tessera; license prefix and product are Switchboard's.",
+  "keys": {
+    "license": {
+      "kid": "T1",
+      "publicKeyBase64": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f"
+    },
+    "revocation": {
+      "kid": "TR1",
+      "publicKeyBase64": "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=",
+      "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEICAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/"
+    },
+    "other": {
+      "publicKeyBase64": "JUO5L/EJVRFHatyDadtt3JM2ZaEZeN2hQE7hBmypVZ0=",
+      "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEIEBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5f"
+    }
+  },
+  "license": {
+    "payload": {
+      "v": 1,
+      "kid": "T1",
+      "lid": "0123456789abcdef0123456789abcdef",
+      "email": "buyer@example.com",
+      "iat": 1762525200,
+      "product": "switchboard-pro"
+    },
+    "valid": "SWB1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.uSSHn8ePFjOxdXUDRUu31oSVuDYUUouZXM1-Btlr0FVr5oUSpIjxmkVFYFrrJy_jrsssJ0UMmffTIM4R9IUMCw",
+    "validWithWhitespace": "  SWB1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjA\nxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.uSSHn8ePFjOxdXUDRUu31oSVuDYUUouZXM1-Btlr0FVr5oUSpIjxmkVFYFrrJy_jrsssJ0UMmffTIM4R9IUMCw\n",
+    "tamperedPayload": "SWB1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJldmlsQGV4YW1wbGUuY29tIiwiaWF0IjoxNzYyNTI1MjAwLCJwcm9kdWN0Ijoic3dpdGNoYm9hcmQtcHJvIn0.uSSHn8ePFjOxdXUDRUu31oSVuDYUUouZXM1-Btlr0FVr5oUSpIjxmkVFYFrrJy_jrsssJ0UMmffTIM4R9IUMCw",
+    "signedByOtherKey": "SWB1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.A0L3I87GsgoFfQ-kaP5YiPQhSrTtOAcQiRqnD20mDgEhhtqCjmeLHIEqSVMVkDbbAOo8rYexjCYv4shl9HfKDQ",
+    "unknownKid": "SWB1-eyJ2IjoxLCJraWQiOiJaWiIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.YPgrYl5eHkAww9oPMf38EqklbOdPWHgSFGnxdxJektZxx5MgTDovkuWG-SCRXd3jeDkG9Ul4fezLWM_uQkYXDw",
+    "wrongProduct": "SWB1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InRlc3NlcmEtcHJvIn0.S-R0lh5_mZC3KrlN0OutqADdcG7nX8HA9tJgvGpj95IAUcMFixG5jir6c0y5BRvVVbjZYvdX-ogVdDn82lP0Bw",
+    "malformed": [
+      "",
+      "SWB1-",
+      "SWB2-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.uSSHn8ePFjOxdXUDRUu31oSVuDYUUouZXM1-Btlr0FVr5oUSpIjxmkVFYFrrJy_jrsssJ0UMmffTIM4R9IUMCw",
+      "SWB1-abc",
+      "SWB1-!!!.???",
+      "TSR1-eyJ2IjoxLCJraWQiOiJUMSIsImxpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwiZW1haWwiOiJidXllckBleGFtcGxlLmNvbSIsImlhdCI6MTc2MjUyNTIwMCwicHJvZHVjdCI6InN3aXRjaGJvYXJkLXBybyJ9.uSSHn8ePFjOxdXUDRUu31oSVuDYUUouZXM1-Btlr0FVr5oUSpIjxmkVFYFrrJy_jrsssJ0UMmffTIM4R9IUMCw"
+    ]
+  },
+  "revocationList": {
+    "payload": {
+      "v": 1,
+      "kid": "TR1",
+      "seq": 7,
+      "generated": 1762600000,
+      "revoked": [
+        "0123456789abcdef0123456789abcdef",
+        "ffffffffffffffffffffffffffffffff"
+      ]
+    },
+    "valid": {
+      "payload": "eyJ2IjoxLCJraWQiOiJUUjEiLCJzZXEiOjcsImdlbmVyYXRlZCI6MTc2MjYwMDAwMCwicmV2b2tlZCI6WyIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsImZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIl19",
+      "sig": "PzxyW3JaVgABPsde8aOOx-_fzds7vqfFx_OE3IfxggqmPbP4UmQ2bcK0gM-g31maCUhqRJjpEWVQZjoa_rHjCQ"
+    },
+    "signedWithLicenseKey": {
+      "payload": "eyJ2IjoxLCJraWQiOiJUUjEiLCJzZXEiOjcsImdlbmVyYXRlZCI6MTc2MjYwMDAwMCwicmV2b2tlZCI6WyIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsImZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIl19",
+      "sig": "suwrl3zCIJ_iP51ls5reLZajc5lZzQLUhz24f2pYH129cwy3s_PM-e9KyVP4PK2-d9sm_xvX6KG7crrw8YpbAQ"
+    }
+  }
+}

@@ -1,14 +1,19 @@
 // Resend REST client and the email bodies. Email text never goes to logs.
 
+import { DEFAULT_APP } from "./apps.js";
+
+// Tessera's links, kept as constants for the existing callers; every email function takes an app (default Tessera).
 export const SITE = "https://conorgriffin.com";
-export const DOWNLOAD_URL = `${SITE}/tessera/download`;
-export const FIND_LICENSE_URL = `${SITE}/tessera/license`;
+export const DOWNLOAD_URL = DEFAULT_APP.urls.download;
+export const FIND_LICENSE_URL = DEFAULT_APP.urls.findLicense;
 
-/** @param {string} license */
-export const activationUrl = (license) => `tessera-direct://activate?key=${encodeURIComponent(license)}`;
+/** @typedef {import("./apps.js").AppConfig} AppConfig */
 
-/** Gmail strips custom-scheme hrefs, so emails link to this https page, which hands the key to the app. @param {string} license */
-export const activationLink = (license) => `https://www.conorgriffin.com/tessera/activate#key=${encodeURIComponent(license)}`;
+/** @param {string} license @param {AppConfig} [app] */
+export const activationUrl = (license, app = DEFAULT_APP) => `${app.urlScheme}://activate?key=${encodeURIComponent(license)}`;
+
+/** Gmail strips custom-scheme hrefs, so emails link to this https page, which hands the key to the app. @param {string} license @param {AppConfig} [app] */
+export const activationLink = (license, app = DEFAULT_APP) => `${app.urls.activate}#key=${encodeURIComponent(license)}`;
 
 /** @param {string} s */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -44,49 +49,44 @@ export function createMailer({ apiKey, from, replyTo, fetch: fetchImpl = fetch }
   };
 }
 
-export const GUIDE_URL = `${SITE}/tessera/guide`;
-export const SUPPORT_URL = `${SITE}/tessera/support`;
-export const ICON_URL = "https://www.conorgriffin.com/tessera/email-icon.png";
+export const GUIDE_URL = DEFAULT_APP.urls.guide ?? "";
+export const SUPPORT_URL = DEFAULT_APP.urls.support;
+export const ICON_URL = DEFAULT_APP.urls.icon;
 
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 const MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
 const BODY = `font-family:${FONT};font-size:15px;line-height:1.55;color:#2a2b3d`;
-const LINK = "color:#5d52b4;text-decoration:underline";
 
-/** @param {string} href @param {string} label */
-const link = (href, label) => `<a href="${esc(href)}" class="lnk" style="${LINK}">${label}</a>`;
+/** @param {AppConfig} a @param {string} href @param {string} label */
+const link = (a, href, label) => `<a href="${esc(href)}" class="lnk" style="color:${a.email.accent};text-decoration:underline">${label}</a>`;
 
 /** @param {string} html */
 const p = (html) => `<p class="ink" style="margin:0 0 16px;${BODY}">${html}</p>`;
 
-/** One monospace key block, with an optional muted "Licensed to" line. @param {string} license @param {string} [email] */
-const keyBlock = (license, email) =>
-  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${email ? "6" : "16"}px"><tr><td class="keybox" style="font-family:${MONO};font-size:13px;line-height:1.5;color:#1e2034;background-color:#f3f2fb;border:1px solid #dcd8f3;border-radius:10px;padding:14px;word-break:break-all;overflow-wrap:anywhere">${esc(license)}</td></tr></table>` +
+/** One monospace key block, with an optional muted "Licensed to" line. @param {AppConfig} a @param {string} license @param {string} [email] */
+const keyBlock = (a, license, email) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${email ? "6" : "16"}px"><tr><td class="keybox" style="font-family:${MONO};font-size:13px;line-height:1.5;color:#1e2034;background-color:${a.email.keyBg};border:1px solid ${a.email.keyBorder};border-radius:10px;padding:14px;word-break:break-all;overflow-wrap:anywhere">${esc(license)}</td></tr></table>` +
   (email ? `<p class="muted" style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:#6b6c80">Licensed to ${esc(email)}</p>` : "");
 
-/** Bulletproof button: a table cell carries the colour so Outlook honours it. @param {string} href @param {string} label */
-const button = (href, label) =>
-  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px"><tr><td class="btn" align="center" bgcolor="#5d52b4" style="background-color:#5d52b4;border-radius:10px"><a href="${esc(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:10px">${label}</a></td></tr></table>`;
+/** Bulletproof button: a table cell carries the colour so Outlook honours it. @param {AppConfig} a @param {string} href @param {string} label */
+const button = (a, href, label) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px"><tr><td class="btn" align="center" bgcolor="${a.email.accent}" style="background-color:${a.email.accent};border-radius:10px"><a href="${esc(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:10px">${label}</a></td></tr></table>`;
 
 /**
- * Shared template for every email: table layout, inline styles, dark-mode overrides for clients that honour them.
+ * Shared template for every email, branded by the app: table layout, inline styles, dark-mode overrides for clients that honour them.
+ * @param {AppConfig} a
  * @param {{ preheader: string, bodyHtml: string, footerLinks?: boolean }} o
  */
-function layout({ preheader, bodyHtml, footerLinks = true }) {
+function layout(a, { preheader, bodyHtml, footerLinks = true }) {
   const links = footerLinks
-    ? `<p class="muted" style="margin:0 0 8px;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b6c80">${[
-        ["Download", DOWNLOAD_URL],
-        ["Guide", GUIDE_URL],
-        ["Support", SUPPORT_URL],
-        ["Find my license", FIND_LICENSE_URL],
-      ]
-        .map(([l, h]) => `<a href="${esc(h)}" class="muted" style="color:#6b6c80;text-decoration:underline">${l}</a>`)
+    ? `<p class="muted" style="margin:0 0 8px;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b6c80">${a.email.footerLinks
+        .map(([l, key]) => `<a href="${esc(/** @type {string} */ (a.urls[key]))}" class="muted" style="color:#6b6c80;text-decoration:underline">${l}</a>`)
         .join(" &middot; ")}</p>`
     : "";
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
-<title>Tessera</title>
+<title>${esc(a.name)}</title>
 <style>
 :root{color-scheme:light dark;supported-color-schemes:light dark}
 @media (prefers-color-scheme: dark){
@@ -94,9 +94,9 @@ function layout({ preheader, bodyHtml, footerLinks = true }) {
 .card{background-color:#1e2034 !important;border-color:#2e3048 !important}
 .ink{color:#ececf4 !important}
 .muted{color:#a7a8bd !important}
-.keybox{background-color:#262842 !important;border-color:#3a3c5c !important;color:#ececf4 !important}
-.lnk{color:#b3acf0 !important}
-.btn{background-color:#5d52b4 !important}
+.keybox{background-color:${a.email.keyBgDark} !important;border-color:${a.email.keyBorderDark} !important;color:#ececf4 !important}
+.lnk{color:${a.email.linkDark} !important}
+.btn{background-color:${a.email.accent} !important}
 }
 </style></head>
 <body class="bg" style="margin:0;padding:0;background-color:#f4f4f8">
@@ -104,71 +104,75 @@ function layout({ preheader, bodyHtml, footerLinks = true }) {
 <table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f8" style="background-color:#f4f4f8"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px">
 <tr><td style="padding:0 0 20px 4px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td style="padding:0 12px 0 0;vertical-align:middle"><img src="${ICON_URL}" width="48" height="48" alt="Tessera" style="display:block;border:0;border-radius:11px"></td>
-<td style="vertical-align:middle"><span class="ink" style="font-family:${FONT};font-size:22px;font-weight:600;line-height:1.2;color:#1e2034">Tessera</span></td>
+<td style="padding:0 12px 0 0;vertical-align:middle"><img src="${a.urls.icon}" width="48" height="48" alt="${esc(a.name)}" style="display:block;border:0;border-radius:11px"></td>
+<td style="vertical-align:middle"><span class="ink" style="font-family:${FONT};font-size:22px;font-weight:600;line-height:1.2;color:#1e2034">${esc(a.name)}</span></td>
 </tr></table></td></tr>
 <tr><td class="card" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #e6e6ee;border-radius:12px;padding:32px">
 ${bodyHtml}
 </td></tr>
 <tr><td align="center" style="padding:20px 8px 0">
 ${links}
-<p class="muted" style="margin:0;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b6c80">Tessera is made by Conor Griffin in Ireland. Payments are handled by Stripe.</p>
+<p class="muted" style="margin:0;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b6c80">${esc(a.name)} is made by Conor Griffin in Ireland. Payments are handled by Stripe.</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
 
-/** @param {string} supportEmail */
-const questions = (supportEmail) =>
-  p(`Questions? Reply to this email or write to ${link(`mailto:${supportEmail}`, esc(supportEmail))}.`);
+/** @param {AppConfig} a @param {string} supportEmail */
+const questions = (a, supportEmail) =>
+  p(`Questions? Reply to this email or write to ${link(a, `mailto:${supportEmail}`, esc(supportEmail))}.`);
 const signoff = p("Conor").replace("margin:0 0 16px", "margin:0");
 
-/** @param {{ license: string }} rec */
-function licenseBlockText(rec) {
-  return `${rec.license}\n\nOpen in Tessera: ${activationLink(rec.license)}`;
+/** @param {AppConfig} a @param {{ license: string }} rec */
+function licenseBlockText(a, rec) {
+  return `${rec.license}\n\nOpen in ${a.name}: ${activationLink(rec.license, a)}`;
 }
 
-/** @param {{ license: string, email: string }} rec @param {string} supportEmail */
-export function licenseEmail(rec, supportEmail) {
-  const subject = "Your Tessera Pro license";
-  const text = `Thanks for buying Tessera Pro.
+/** The two ways to activate, as plain text and as html. @param {AppConfig} a */
+const activateText = (a) => `${a.copy.activateOpen} ${a.copy.activateMenu} and paste the key.`;
+const activateHtml = (/** @type {AppConfig} */ a) => `${a.copy.activateOpen} <strong>${a.copy.activateMenu}</strong> and paste the key.`;
+
+/** @param {{ license: string, email: string }} rec @param {string} supportEmail @param {AppConfig} [a] */
+export function licenseEmail(rec, supportEmail, a = DEFAULT_APP) {
+  const subject = `Your ${a.productName} license`;
+  const text = `Thanks for buying ${a.productName}.
 
 Your license key:
 
 ${rec.license}
 
-To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
-${activationLink(rec.license)}
+To activate, ${activateText(a)} Or open this link on your Mac:
+${activationLink(rec.license, a)}
 
-If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
+If your email app wraps the key over several lines, that's fine. ${a.name} ignores line breaks and spaces.
 
-Download Tessera: ${DOWNLOAD_URL}
-Lost this email? Find your license: ${FIND_LICENSE_URL}
+Download ${a.name}: ${a.urls.download}
+Lost this email? Find your license: ${a.urls.findLicense}
 
 Questions? Reply to this email or write to ${supportEmail}.
 
 Conor
 `;
-  const html = layout({
-    preheader: "Your Tessera Pro license key is inside.",
+  const html = layout(a, {
+    preheader: `Your ${a.productName} license key is inside.`,
     bodyHtml: [
-      p("Thanks for buying Tessera Pro."),
+      p(`Thanks for buying ${esc(a.productName)}.`),
       p("Your license key:"),
-      keyBlock(rec.license, rec.email),
-      button(activationLink(rec.license), "Open in Tessera &rarr;"),
-      p(`To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or ${link(activationLink(rec.license), "open it in Tessera")} on your Mac.`),
-      p("If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces."),
-      p(`${link(DOWNLOAD_URL, "Download Tessera")} &middot; ${link(FIND_LICENSE_URL, "Lost this email? Find your license")}`),
-      questions(supportEmail),
+      keyBlock(a, rec.license, rec.email),
+      button(a, activationLink(rec.license, a), `Open in ${esc(a.name)} &rarr;`),
+      p(`To activate, ${activateHtml(a)} Or ${link(a, activationLink(rec.license, a), `open it in ${esc(a.name)}`)} on your Mac.`),
+      p(`If your email app wraps the key over several lines, that's fine. ${esc(a.name)} ignores line breaks and spaces.`),
+      p(`${link(a, a.urls.download, `Download ${esc(a.name)}`)} &middot; ${link(a, a.urls.findLicense, "Lost this email? Find your license")}`),
+      questions(a, supportEmail),
       signoff,
     ].join("\n"),
   });
   return { subject, text, html };
 }
 
-/** Sent when the owner gives a free licence. Never mentions the admin's private note. @param {{ license: string, email: string }} rec @param {string} supportEmail */
-export function freeLicenseEmail(rec, supportEmail) {
-  const subject = "Your free Tessera Pro license";
-  const text = `Here's a Tessera Pro license for you, on me. Enjoy!
+/** Sent when the owner gives a free licence. Never mentions the admin's private note. @param {{ license: string, email: string }} rec @param {string} supportEmail @param {AppConfig} [a] */
+export function freeLicenseEmail(rec, supportEmail, a = DEFAULT_APP) {
+  const subject = `Your free ${a.productName} license`;
+  const text = `Here's a ${a.productName} license for you, on me. Enjoy!
 
 Your license key:
 
@@ -176,132 +180,132 @@ ${rec.license}
 
 Licensed to ${rec.email}
 
-To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
-${activationLink(rec.license)}
+To activate, ${activateText(a)} Or open this link on your Mac:
+${activationLink(rec.license, a)}
 
-If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
+If your email app wraps the key over several lines, that's fine. ${a.name} ignores line breaks and spaces.
 
-Download Tessera: ${DOWNLOAD_URL}
-Lost this email? Find your license: ${FIND_LICENSE_URL}
+Download ${a.name}: ${a.urls.download}
+Lost this email? Find your license: ${a.urls.findLicense}
 
 Questions? Reply to this email or write to ${supportEmail}.
 
 Conor
 `;
-  const html = layout({
-    preheader: "A free Tessera Pro license, on me.",
+  const html = layout(a, {
+    preheader: `A free ${a.productName} license, on me.`,
     bodyHtml: [
-      p("Here's a Tessera Pro license for you, on me. Enjoy!"),
+      p(`Here's a ${esc(a.productName)} license for you, on me. Enjoy!`),
       p("Your license key:"),
-      keyBlock(rec.license, rec.email),
-      button(activationLink(rec.license), "Open in Tessera &rarr;"),
-      p(`To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or ${link(activationLink(rec.license), "open it in Tessera")} on your Mac.`),
-      p("If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces."),
-      p(`${link(DOWNLOAD_URL, "Download Tessera")} &middot; ${link(FIND_LICENSE_URL, "Lost this email? Find your license")}`),
-      questions(supportEmail),
+      keyBlock(a, rec.license, rec.email),
+      button(a, activationLink(rec.license, a), `Open in ${esc(a.name)} &rarr;`),
+      p(`To activate, ${activateHtml(a)} Or ${link(a, activationLink(rec.license, a), `open it in ${esc(a.name)}`)} on your Mac.`),
+      p(`If your email app wraps the key over several lines, that's fine. ${esc(a.name)} ignores line breaks and spaces.`),
+      p(`${link(a, a.urls.download, `Download ${esc(a.name)}`)} &middot; ${link(a, a.urls.findLicense, "Lost this email? Find your license")}`),
+      questions(a, supportEmail),
       signoff,
     ].join("\n"),
   });
   return { subject, text, html };
 }
 
-/** Sent with a replacement key. Deliberately says nothing about why. @param {{ license: string, email: string }} rec @param {string} supportEmail */
-export function reissuedEmail(rec, supportEmail) {
-  const subject = "Your new Tessera Pro license";
-  const text = `Here is your new Tessera Pro license key. Your previous key has been replaced and will stop working, so please use this one from now on.
+/** Sent with a replacement key. Deliberately says nothing about why. @param {{ license: string, email: string }} rec @param {string} supportEmail @param {AppConfig} [a] */
+export function reissuedEmail(rec, supportEmail, a = DEFAULT_APP) {
+  const subject = `Your new ${a.productName} license`;
+  const text = `Here is your new ${a.productName} license key. Your previous key has been replaced and will stop working, so please use this one from now on.
 
 Your new license key:
 
 ${rec.license}
 
-To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Or open this link on your Mac:
-${activationLink(rec.license)}
+To activate, ${activateText(a)} Or open this link on your Mac:
+${activationLink(rec.license, a)}
 
-If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces.
+If your email app wraps the key over several lines, that's fine. ${a.name} ignores line breaks and spaces.
 
-Lost this email? Find your license: ${FIND_LICENSE_URL}
+Lost this email? Find your license: ${a.urls.findLicense}
 
 Questions? Reply to this email or write to ${supportEmail}.
 
 Conor
 `;
-  const html = layout({
-    preheader: "Your new Tessera Pro license key is inside.",
+  const html = layout(a, {
+    preheader: `Your new ${a.productName} license key is inside.`,
     bodyHtml: [
-      p("Here is your new Tessera Pro license key. Your previous key has been replaced and will stop working, so please use this one from now on."),
+      p(`Here is your new ${esc(a.productName)} license key. Your previous key has been replaced and will stop working, so please use this one from now on.`),
       p("Your new license key:"),
-      keyBlock(rec.license, rec.email),
-      button(activationLink(rec.license), "Open in Tessera &rarr;"),
-      p(`To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Or ${link(activationLink(rec.license), "open it in Tessera")} on your Mac.`),
-      p("If your email app wraps the key over several lines, that's fine. Tessera ignores line breaks and spaces."),
-      p(link(FIND_LICENSE_URL, "Lost this email? Find your license")),
-      questions(supportEmail),
+      keyBlock(a, rec.license, rec.email),
+      button(a, activationLink(rec.license, a), `Open in ${esc(a.name)} &rarr;`),
+      p(`To activate, ${activateHtml(a)} Or ${link(a, activationLink(rec.license, a), `open it in ${esc(a.name)}`)} on your Mac.`),
+      p(`If your email app wraps the key over several lines, that's fine. ${esc(a.name)} ignores line breaks and spaces.`),
+      p(link(a, a.urls.findLicense, "Lost this email? Find your license")),
+      questions(a, supportEmail),
       signoff,
     ].join("\n"),
   });
   return { subject, text, html };
 }
 
-/** @param {{ license: string }[]} recs @param {string} supportEmail */
-export function resendEmail(recs, supportEmail) {
-  const subject = "Your Tessera Pro license";
+/** @param {{ license: string }[]} recs @param {string} supportEmail @param {AppConfig} [a] */
+export function resendEmail(recs, supportEmail, a = DEFAULT_APP) {
+  const subject = `Your ${a.productName} license`;
   const many = recs.length > 1;
-  const text = `Here ${many ? "are your licenses" : "is your license"} for Tessera Pro.
+  const text = `Here ${many ? "are your licenses" : "is your license"} for ${a.productName}.
 
-${recs.map((r) => licenseBlockText(r)).join("\n\n---\n\n")}
+${recs.map((r) => licenseBlockText(a, r)).join("\n\n---\n\n")}
 
-To activate, open Tessera, go to Settings › Purchases › Enter License… and paste the key. Tessera ignores line breaks and spaces.
+To activate, ${activateText(a)} ${a.name} ignores line breaks and spaces.
 
-Download Tessera: ${DOWNLOAD_URL}
+Download ${a.name}: ${a.urls.download}
 Questions? Reply to this email or write to ${supportEmail}.
 
 Conor
 `;
-  const html = layout({
-    preheader: many ? "Your Tessera Pro license keys are inside." : "Your Tessera Pro license key is inside.",
+  const html = layout(a, {
+    preheader: many ? `Your ${a.productName} license keys are inside.` : `Your ${a.productName} license key is inside.`,
     bodyHtml: [
-      p(`Here ${many ? "are your licenses" : "is your license"} for Tessera Pro.`),
-      ...recs.map((r) => keyBlock(r.license) + button(activationLink(r.license), "Open in Tessera &rarr;")),
-      p("To activate, open Tessera, go to <strong>Settings › Purchases › Enter License…</strong> and paste the key. Tessera ignores line breaks and spaces."),
-      p(link(DOWNLOAD_URL, "Download Tessera")),
-      questions(supportEmail),
+      p(`Here ${many ? "are your licenses" : "is your license"} for ${esc(a.productName)}.`),
+      ...recs.map((r) => keyBlock(a, r.license) + button(a, activationLink(r.license, a), `Open in ${esc(a.name)} &rarr;`)),
+      p(`To activate, ${activateHtml(a)} ${esc(a.name)} ignores line breaks and spaces.`),
+      p(link(a, a.urls.download, `Download ${esc(a.name)}`)),
+      questions(a, supportEmail),
       signoff,
     ].join("\n"),
   });
   return { subject, text, html };
 }
 
-export const BUY_URL = `${SITE}/tessera/buy`;
+export const BUY_URL = DEFAULT_APP.urls.buy;
 
 /**
- * Sent once when a refund or dispute deactivates a licence. Neutral wording: the app quietly drops to the free version.
- * @param {{ lid: string, email: string }} rec @param {string} supportEmail
+ * Sent once when a refund or dispute deactivates a licence. Neutral wording: the app quietly drops back to its free state.
+ * @param {{ lid: string, email: string }} rec @param {string} supportEmail @param {AppConfig} [a]
  */
-export function revokedEmail(rec, supportEmail) {
-  const subject = "Your Tessera Pro license has been deactivated";
-  const text = `Your Tessera Pro license is no longer active. This happens when a payment is refunded or disputed.
+export function revokedEmail(rec, supportEmail, a = DEFAULT_APP) {
+  const subject = `Your ${a.productName} license has been deactivated`;
+  const text = `Your ${a.productName} license is no longer active. This happens when a payment is refunded or disputed.
 
 Licensed to: ${rec.email}
 License ID: ${rec.lid}
 
-Tessera keeps working as the free version, and everything you've saved stays where it is.
+${a.copy.revokedKeepsWorking}
 
-If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can buy Tessera Pro again at any time: ${BUY_URL}
+If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can buy ${a.productName} again at any time: ${a.urls.buy}
 
 Questions? Reply to this email or write to ${supportEmail}.
 
 Conor
 `;
   const meta = `<p class="muted" style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.6;color:#6b6c80">Licensed to ${esc(rec.email)}<br>License ID ${esc(rec.lid)}</p>`;
-  const html = layout({
-    preheader: "Your Tessera Pro license is no longer active.",
+  const html = layout(a, {
+    preheader: `Your ${a.productName} license is no longer active.`,
     bodyHtml: [
-      p("Your Tessera Pro license is no longer active. This happens when a payment is refunded or disputed."),
+      p(`Your ${esc(a.productName)} license is no longer active. This happens when a payment is refunded or disputed.`),
       meta,
-      p("Tessera keeps working as the free version, and everything you've saved stays where it is."),
-      p("If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can also buy Tessera Pro again at any time."),
-      button(BUY_URL, "Buy Tessera Pro &rarr;"),
-      questions(supportEmail),
+      p(esc(a.copy.revokedKeepsWorking)),
+      p(`If you think this is a mistake, reply to this email with the license ID above and I'll sort it out. You can also buy ${esc(a.productName)} again at any time.`),
+      button(a, a.urls.buy, `Buy ${esc(a.productName)} &rarr;`),
+      questions(a, supportEmail),
       signoff,
     ].join("\n"),
   });

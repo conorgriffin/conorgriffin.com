@@ -3,12 +3,18 @@
   "framework": "vite",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/tessera/buy", "destination": "/api/tessera/go?to=buy" },
-    { "source": "/tessera/download", "destination": "/api/tessera/go?to=download" }
+    { "source": "/tessera/buy", "destination": "/api/tessera/go?to=buy&app=tessera" },
+    { "source": "/tessera/download", "destination": "/api/tessera/go?to=download&app=tessera" },
+    { "source": "/switchboard/buy", "destination": "/api/switchboard/go?to=buy&app=switchboard" },
+    { "source": "/switchboard/download", "destination": "/api/switchboard/go?to=download&app=switchboard" }
   ],
   "headers": [
     {
       "source": "/tessera/appcast.xml",
+      "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
+    },
+    {
+      "source": "/switchboard/appcast.xml",
       "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
     },
     {
@@ -47,7 +53,22 @@
         { "key": "Referrer-Policy", "value": "no-referrer" },
         { "key": "Cache-Control", "value": "no-store" }
       ]
+    },
+    {
+      "source": "/switchboard/thanks",
+      "headers": [
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/switchboard/activate",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
     }
   ],
-  "crons": [{ "path": "/api/tessera/reconcile", "schedule": "17 4 * * *" }]
+  "crons": [{ "path": "/api/all/reconcile", "schedule": "17 4 * * *" }]
 }

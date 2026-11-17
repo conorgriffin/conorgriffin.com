@@ -1,8 +1,13 @@
-// "Sign in with Google" for the Tessera admin page: OAuth 2.0 authorization code + PKCE, ID token
+// One admin identity for every app (the admin page lives at /tessera/admin and has an app picker). The Google client,
+// the cookie secret and the host are shared; each app has its own bearer secret and its own allowlist
+// (apps.js env.adminSecret / env.adminEmails), so a person can be allowed into one app and not another. Sessions and
+// the failed-attempt counters live in `ctx.adminStore` (Tessera's Redis namespace) whichever app a request is for.
+// "Sign in with Google" for the admin page: OAuth 2.0 authorization code + PKCE, ID token
 // verification against Google's JWKS, and HMAC-signed cookies. Node built-ins only.
 //
 // Nothing here logs an email address, a token or a key; failures are logged as short reason names.
 import crypto from "node:crypto";
+import { DEFAULT_APP } from "./apps.js";
 import { b64url, b64urlDecode, safeEqual } from "./crypto.js";
 
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -29,13 +34,14 @@ const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
 /**
  * The Google admin settings, or null when any of them is missing (then every admin-auth route answers 404).
  * @param {Record<string, string | undefined>} env
+ * @param {import("./apps.js").AppConfig} [app] whose allowlist applies (default Tessera)
  * @returns {{ clientId: string, clientSecret: string, emails: Set<string>, sessionSecret: string, baseUrl: string, origin: string, redirectUri: string } | null}
  */
-export function googleAdminConfig(env) {
+export function googleAdminConfig(env, app = DEFAULT_APP) {
   const clientId = (env.GOOGLE_CLIENT_ID ?? "").trim();
   const clientSecret = (env.GOOGLE_CLIENT_SECRET ?? "").trim();
   const sessionSecret = env.TESSERA_ADMIN_SESSION_SECRET ?? "";
-  const emails = new Set((env.TESSERA_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const emails = new Set((env[app.env.adminEmails] ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
   if (!clientId || !clientSecret || emails.size === 0 || sessionSecret.length < 32) return null;
   let url;
   try {
@@ -54,10 +60,10 @@ const warnedShortSecret = new WeakSet();
 /**
  * The bearer secret for POST /api/tessera/admin, or "" when unset or shorter than 32 characters (then the bearer path
  * is off, as if unset; a short secret could be guessed online).
- * @param {{ env: Record<string, string | undefined>, log?: { warn: (msg: string, f?: object) => void } }} ctx
+ * @param {{ env: Record<string, string | undefined>, app?: import("./apps.js").AppConfig, log?: { warn: (msg: string, f?: object) => void } }} ctx
  */
 export function adminSecret(ctx) {
-  const secret = ctx.env.TESSERA_ADMIN_SECRET ?? "";
+  const secret = ctx.env[(ctx.app ?? DEFAULT_APP).env.adminSecret] ?? "";
   if (secret.length >= ADMIN_SECRET_MIN_LENGTH) return secret;
   if (secret && !warnedShortSecret.has(ctx)) {
     warnedShortSecret.add(ctx);
@@ -165,14 +171,17 @@ export function sessionCookie(email, sid, secret, nowMs) {
   return serializeCookie(SESSION_COOKIE, signValue({ email, sid, exp, v: 2 }, secret, "session"), { ...SESSION_COOKIE_OPTS, maxAge: SESSION_MAX_AGE_SECONDS });
 }
 
+/** Where admin sessions live: Tessera's namespace whichever app the request is for. @param {{ store: any, adminStore?: any }} ctx */
+const sessionStore = (ctx) => ctx.adminStore ?? ctx.store;
+
 /**
  * Creates the server-side half of a session: a random id held in Redis for 8 hours. A cookie is only good while
  * its id is still there, so logout (or deleting the key) ends it for real.
- * @param {{ store: any }} ctx @param {string} email
+ * @param {{ store: any, adminStore?: any }} ctx @param {string} email
  */
 export async function startSession(ctx, email) {
   const sid = b64url(crypto.randomBytes(32));
-  await ctx.store.set(sessionKey(sid), email.trim().toLowerCase(), { ex: SESSION_MAX_AGE_SECONDS });
+  await sessionStore(ctx).set(sessionKey(sid), email.trim().toLowerCase(), { ex: SESSION_MAX_AGE_SECONDS });
   return { sid };
 }
 
@@ -185,29 +194,30 @@ function sessionPayload(/** @type {{ now: () => number }} */ ctx, /** @type {Req
 }
 
 /** Logout: removes the session from Redis if the request carries a validly signed session cookie. */
-export async function endSession(/** @type {{ env: Record<string, string | undefined>, now: () => number, store: any }} */ ctx, /** @type {Request} */ request) {
-  const cfg = googleAdminConfig(ctx.env);
+export async function endSession(/** @type {{ env: Record<string, string | undefined>, app?: import("./apps.js").AppConfig, now: () => number, store: any, adminStore?: any }} */ ctx, /** @type {Request} */ request) {
+  const cfg = googleAdminConfig(ctx.env, ctx.app);
   const s = cfg && sessionPayload(ctx, request, cfg.sessionSecret);
-  if (s) await ctx.store.del(sessionKey(s.sid));
+  if (s) await sessionStore(ctx).del(sessionKey(s.sid));
 }
 
 /**
  * The signed-in admin's email for a request, or null. Needs a valid signed cookie, the session id still live in Redis
  * (so logout works), and the email still in the allowlist (so removing an address signs that person out at once).
  * Fails closed if Redis can't be reached.
- * @param {{ env: Record<string, string | undefined>, now: () => number, store: any, log?: any }} ctx
+ * With an app on the context, the allowlist is that app's.
+ * @param {{ env: Record<string, string | undefined>, app?: import("./apps.js").AppConfig, now: () => number, store: any, adminStore?: any, log?: any }} ctx
  * @param {Request} request
  * @returns {Promise<string | null>}
  */
 export async function sessionEmail(ctx, request) {
-  const cfg = googleAdminConfig(ctx.env);
+  const cfg = googleAdminConfig(ctx.env, ctx.app);
   if (!cfg) return null;
   const s = sessionPayload(ctx, request, cfg.sessionSecret);
   if (!s) return null;
   const email = s.email.trim().toLowerCase();
   if (!cfg.emails.has(email)) return null;
   try {
-    return (await ctx.store.get(sessionKey(s.sid))) === email ? email : null;
+    return (await sessionStore(ctx).get(sessionKey(s.sid))) === email ? email : null;
   } catch (e) {
     ctx.log?.warn("admin session lookup failed", { error: (e && /** @type {any} */ (e).name) || "Error" });
     return null;
