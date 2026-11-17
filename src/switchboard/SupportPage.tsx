@@ -6,7 +6,7 @@ const faqs: [string, string][] = [
   ["How does Auto-Switch work?", "In Settings, open the Auto-Switch tab and add a rule for each device you want picked. Rules are checked from the top, and the first one whose devices are all connected is used. A rule can also wait for another device, such as a dock, to be connected. If no rule matches, your current device is left as it is."],
   ["Can it switch microphones too?", "Yes. The menu lists your inputs below your outputs, and Auto-Switch has a separate Input list, so a USB mic can take over from a Bluetooth headset when it's plugged in."],
   ["What happens when the 14-day trial ends?", "The menu still lists your devices and switches between them, and device shortcuts keep working. Auto-Switch pauses until you unlock the app with a one-time purchase. Your rules are kept."],
-  ["I bought Audio Switchboard on your website. How do I get my license again?", "Go to conorgriffin.com/switchboard/license and enter the email you bought with. I'll send your license again. Then open Settings › Purchase in the app and paste it."],
+  ["I bought Audio Switchboard on your website. How do I get my license again?", "Go to conorgriffin.com/switchboard/license and enter the email you bought with. I'll send your license again. Then open Settings › License in the app and paste it."],
   ["A device I just connected isn't listed. What should I do?", "Bluetooth devices can take a few seconds to appear. If one still isn't there, press the Rescan button next to Output in the menu."],
   ["What macOS version do I need?", "macOS 14 (Sonoma) or later."],
 ];

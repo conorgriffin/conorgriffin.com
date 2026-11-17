@@ -123,7 +123,7 @@ export function ThanksPage() {
           <h2 id="steps-title" className="text-2xl font-medium md:text-3xl">How to activate</h2>
           <ol className="mt-4 list-decimal space-y-3 pl-6 text-lg leading-relaxed text-muted-foreground">
             <li>Download and open Audio Switchboard, if you haven't already.</li>
-            <li>In Audio Switchboard, open <strong className="font-medium text-foreground">Settings › Purchase</strong>, or press Open in Audio Switchboard above.</li>
+            <li>In Audio Switchboard, open <strong className="font-medium text-foreground">Settings › License</strong>, or press Open in Audio Switchboard above.</li>
             <li>Paste your key and activate.</li>
           </ol>
           <p className="mt-6 text-muted-foreground">Lost the key later? <a href={paths.license} className="text-foreground underline underline-offset-4 hover:text-primary">Find my license</a> any time. Please don't share it: it's tied to your purchase.</p>
@@ -193,7 +193,7 @@ export function ActivatePage() {
               </div>
               {copy === "failed" && <p className="mt-3 text-sm text-tessera-warn">Couldn't copy automatically. Select the key above and copy it.</p>}
               <p className="mt-6 text-tessera-panel-muted">
-                Nothing happened? Make sure Audio Switchboard is <a href={downloadPath} className={inline}>installed</a>, or open it, go to <strong className="font-medium text-tessera-panel-ink">Settings › Purchase</strong> and paste the key.
+                Nothing happened? Make sure Audio Switchboard is <a href={downloadPath} className={inline}>installed</a>, or open it, go to <strong className="font-medium text-tessera-panel-ink">Settings › License</strong> and paste the key.
               </p>
             </>
           )}

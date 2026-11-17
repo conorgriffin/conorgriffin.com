@@ -124,7 +124,7 @@ export const APPS = {
     },
     copy: {
       activateOpen: "open Audio Switchboard, go to",
-      activateMenu: "Settings › Purchase",
+      activateMenu: "Settings › License › Enter License…",
       revokedKeepsWorking: "Audio Switchboard keeps working, but Auto-Switch stays paused until it's unlocked again. Your rules and settings stay exactly as they are.",
     },
   },
