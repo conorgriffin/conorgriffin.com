@@ -6,6 +6,16 @@
     <description>Updates for Tessera, the JWT and JWE inspector for Mac.</description>
     <language>en</language>
     <item>
+      <title>Version 1.2.2</title>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 18 Nov 2026 12:23:05 +0000</pubDate>
+      <enclosure url="https://github.com/conorgriffin/tessera-releases/releases/download/v1.2.2/Tessera-1.2.2.dmg"
+                 sparkle:edSignature="M+Uqx6Qx56qZr5muTajZPB0GjZJnahKCb9eWj6e9NYmVWZeNN6xGxVQ1DhESRxbLCUMvkbtwfnbhlliM9lsHDA==" length="6053507"
+                 type="application/octet-stream" />
+    </item>
+    <item>
       <title>Version 1.2.1</title>
       <sparkle:version>5</sparkle:version>
       <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
